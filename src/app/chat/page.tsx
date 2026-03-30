@@ -275,6 +275,98 @@ function UserMessage({ content, timestamp }: { content: string; timestamp: Date 
   );
 }
 
+function MarkdownRenderer({ content }: { content: string }) {
+  const lines = content.split('\n');
+  const elements: React.ReactNode[] = [];
+  let listItems: string[] = [];
+
+  function flushList(key: string) {
+    if (listItems.length === 0) return;
+    elements.push(
+      <ul key={key} className="my-2 space-y-1 pl-1">
+        {listItems.map((item, i) => (
+          <li key={i} className="flex gap-2 text-sm leading-relaxed">
+            <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-mint/60 shrink-0" />
+            <span>{renderInline(item)}</span>
+          </li>
+        ))}
+      </ul>
+    );
+    listItems = [];
+  }
+
+  function renderInline(text: string): React.ReactNode {
+    const parts = text.split(/(\*\*[^*]+\*\*)/g);
+    return parts.map((part, i) => {
+      if (part.startsWith('**') && part.endsWith('**')) {
+        return <strong key={i} className="font-semibold text-bright">{part.slice(2, -2)}</strong>;
+      }
+      return part;
+    });
+  }
+
+  lines.forEach((line, idx) => {
+    const trimmed = line.trim();
+
+    // H2 heading: ## text
+    if (/^##\s/.test(trimmed)) {
+      flushList(`list-${idx}`);
+      elements.push(
+        <h2 key={idx} className="font-display font-700 text-sm text-mint mt-4 mb-1.5 first:mt-0">
+          {trimmed.replace(/^##\s+/, '')}
+        </h2>
+      );
+      return;
+    }
+
+    // H3 heading: ### text
+    if (/^###\s/.test(trimmed)) {
+      flushList(`list-${idx}`);
+      elements.push(
+        <h3 key={idx} className="font-display font-600 text-sm text-mint/80 mt-3 mb-1 first:mt-0">
+          {trimmed.replace(/^###\s+/, '')}
+        </h3>
+      );
+      return;
+    }
+
+    // Blockquote: > text
+    if (/^>\s/.test(trimmed)) {
+      flushList(`list-${idx}`);
+      elements.push(
+        <blockquote key={idx} className="border-l-2 border-mint/30 pl-3 my-2 text-sm text-muted/80 italic leading-relaxed">
+          {renderInline(trimmed.replace(/^>\s+/, ''))}
+        </blockquote>
+      );
+      return;
+    }
+
+    // Bullet: - or * item
+    if (/^[-*]\s/.test(trimmed)) {
+      listItems.push(trimmed.replace(/^[-*]\s+/, ''));
+      return;
+    }
+
+    // Empty line — flush list, add spacing
+    if (trimmed === '') {
+      flushList(`list-${idx}`);
+      elements.push(<div key={idx} className="h-2" />);
+      return;
+    }
+
+    // Normal paragraph
+    flushList(`list-${idx}`);
+    elements.push(
+      <p key={idx} className="text-sm leading-relaxed">
+        {renderInline(trimmed)}
+      </p>
+    );
+  });
+
+  flushList('list-end');
+  return <div className="space-y-0.5">{elements}</div>;
+}
+
 function AssistantMessage({
   content, timestamp, isStreaming, isError,
 }: { content: string; timestamp: Date; isStreaming?: boolean; isError?: boolean }) {
@@ -292,10 +384,14 @@ function AssistantMessage({
           'rounded-2xl rounded-bl-sm px-4 py-3 border',
           isError ? 'border-coral/30 bg-coral/5 text-coral/90' : 'bg-card border-border text-text'
         )}>
-          <p className="text-sm whitespace-pre-wrap leading-relaxed">
-            {content}
-            {isStreaming && <Cursor />}
-          </p>
+          {isError || isStreaming ? (
+            <p className="text-sm whitespace-pre-wrap leading-relaxed">
+              {content}
+              {isStreaming && <Cursor />}
+            </p>
+          ) : (
+            <MarkdownRenderer content={content} />
+          )}
         </div>
         <time className="font-mono text-xs text-muted/50 pl-1">{formatTime(timestamp)}</time>
       </div>
@@ -693,7 +789,7 @@ function ChatWorkspace() {
         // Step 1: Ontology / Seed Analysis
         updateStage('seed', 'running', 'Analyzing your scenario…');
         const ontologyRes = await postFormData(`${API_URL}/api/graph/ontology/generate`, {
-          simulation_requirement: enrichedText,
+          simulation_requirement: `Please generate all output in English.\n\n${enrichedText}`,
           files: file ? [file] : [],
         });
         if (!ontologyRes.success) throw new Error(ontologyRes.message ?? 'Ontology generation failed');
@@ -773,11 +869,29 @@ function ChatWorkspace() {
 
         // Fetch report and display as first assistant message
         const reportData = await fetchJson(`${API_URL}/api/report/by-simulation/${newSimId}`);
-        const reportContent: string =
+        const rawReport =
+          reportData?.data?.markdown_content ??
           reportData?.data?.content ??
           reportData?.data?.report ??
           reportData?.data?.summary ??
-          JSON.stringify(reportData?.data ?? reportData);
+          reportData?.data;
+        // If rawReport is still a plain object or JSON string, try to extract markdown_content
+        let reportContent: string;
+        if (typeof rawReport === 'string') {
+          try {
+            const parsed = JSON.parse(rawReport);
+            reportContent = parsed?.markdown_content ?? parsed?.content ?? parsed?.report ?? rawReport;
+          } catch {
+            reportContent = rawReport;
+          }
+        } else if (rawReport && typeof rawReport === 'object') {
+          reportContent =
+            (rawReport as Record<string, string>).markdown_content ??
+            (rawReport as Record<string, string>).content ??
+            JSON.stringify(rawReport);
+        } else {
+          reportContent = JSON.stringify(reportData?.data ?? reportData);
+        }
 
         setPipelineComplete(true);
         setChatHistory([

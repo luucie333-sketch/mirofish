@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
 
 const SYSTEM_PROMPT =
-  'You are a scenario expansion assistant. Take the user\'s brief prediction question and expand it into a detailed 200-300 word scenario description. Include specific stakeholders (companies, people, organizations), potential impacts, competing viewpoints, and relevant context. Write it as a factual briefing document, not as a question. Do not use markdown formatting.';
+  'You are a scenario expansion assistant. Take the user\'s brief prediction question and expand it into a detailed 200-300 word scenario description. Include specific stakeholders (companies, people, organizations), potential impacts, competing viewpoints, and relevant context. Write it as a factual briefing document, not as a question. Do not use markdown formatting. Always write the expanded scenario in English, regardless of the input language.';
 
 export async function POST(req: NextRequest) {
   const supabase = createClient();
