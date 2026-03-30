@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import {
   ArrowRight, Github, Paperclip, FileText, Zap,
@@ -136,51 +137,71 @@ function HeroSection({
         </div>
       )}
 
-      <div className="relative z-10 max-w-4xl mx-auto text-center">
-        {/* Pill */}
-        <div className="flex justify-center mb-8">
-          <div className="inline-flex items-center gap-2.5 px-4 py-2 rounded-full border border-mint/20 bg-mint/5 backdrop-blur-sm">
-            <span className="w-1.5 h-1.5 rounded-full bg-mint animate-pulse-slow" aria-hidden />
-            <span className="font-mono text-xs text-mint tracking-wide">Multi-Agent AI · v0.1 · Open Source</span>
+      <div className="relative z-10 w-full max-w-7xl mx-auto">
+
+        {/* Two-column: text left, fish right */}
+        <div className="flex flex-col lg:flex-row items-center gap-10 lg:gap-16 mb-12">
+
+          {/* Left column */}
+          <div className="flex-1 min-w-0 text-center lg:text-left">
+            {/* Pill */}
+            <div className="flex justify-center lg:justify-start mb-8">
+              <div className="inline-flex items-center gap-2.5 px-4 py-2 rounded-full border border-mint/20 bg-mint/5 backdrop-blur-sm">
+                <span className="w-1.5 h-1.5 rounded-full bg-mint animate-pulse-slow" aria-hidden />
+                <span className="font-mono text-xs text-mint tracking-wide">Multi-Agent AI · v0.1 · Open Source</span>
+              </div>
+            </div>
+
+            {/* Headline */}
+            <h1 className="font-display font-800 text-4xl sm:text-5xl lg:text-6xl xl:text-7xl text-bright leading-[1.05] tracking-tight mb-6">
+              See What Happens
+              <span className="block mt-1" style={{ color: '#0FA68C', textShadow: '0 0 40px rgba(15,166,140,0.2)' }}>
+                Before It Happens
+              </span>
+            </h1>
+
+            {/* Subtext */}
+            <p className="text-muted text-lg sm:text-xl leading-relaxed max-w-xl mx-auto lg:mx-0 mb-10">
+              Ask any &ldquo;what if&rdquo; question. MiroFish runs thousands of AI agents through your scenario
+              and delivers a detailed prediction report. Try it free.
+            </p>
+
+            {/* CTAs */}
+            <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-3 mb-6">
+              <Link
+                href="/auth/signin"
+                className="inline-flex items-center justify-center gap-2.5 font-display font-700 text-base px-8 py-4 rounded-xl bg-mint text-bg hover:bg-mint-dim shadow-glow-mint transition-all duration-200 group"
+              >
+                Try It Free
+                <ArrowRight className="w-5 h-5 group-hover:translate-x-0.5 transition-transform" />
+              </Link>
+              <a
+                href="#demo"
+                className="inline-flex items-center gap-2 font-display font-600 text-sm px-6 py-4 rounded-xl border border-border text-text hover:border-mint/30 hover:text-mint transition-all duration-200"
+              >
+                See a Demo
+              </a>
+            </div>
+
+            <p className="font-mono text-xs text-muted/60">
+              1 free prediction · No credit card required
+            </p>
+          </div>
+
+          {/* Right column — fish image */}
+          <div className="w-full max-w-sm lg:w-[400px] lg:max-w-none shrink-0 flex items-center justify-center">
+            <Image
+              src="/images/hero-fish.png"
+              alt="MiroFish — one input spawns a swarm of AI agents that simulate the future"
+              width={400}
+              height={400}
+              priority
+              className="animate-float w-full h-auto drop-shadow-[0_16px_48px_rgba(15,166,140,0.18)]"
+            />
           </div>
         </div>
 
-        {/* Headline */}
-        <h1 className="font-display font-800 text-4xl sm:text-5xl lg:text-6xl xl:text-7xl text-bright leading-[1.05] tracking-tight mb-6">
-          See What Happens
-          <span className="block mt-1" style={{ color: '#0FA68C', textShadow: '0 0 40px rgba(15,166,140,0.2)' }}>
-            Before It Happens
-          </span>
-        </h1>
-
-        {/* Subtext */}
-        <p className="text-muted text-lg sm:text-xl leading-relaxed max-w-2xl mx-auto mb-10">
-          Ask any &ldquo;what if&rdquo; question. MiroFish runs thousands of AI agents through your scenario
-          and delivers a detailed prediction report. Try it free.
-        </p>
-
-        {/* CTAs */}
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-10">
-          <Link
-            href="/auth/signin"
-            className="inline-flex items-center justify-center gap-2.5 font-display font-700 text-base px-8 py-4 rounded-xl bg-mint text-bg hover:bg-mint-dim shadow-glow-mint transition-all duration-200 group"
-          >
-            Try It Free
-            <ArrowRight className="w-5 h-5 group-hover:translate-x-0.5 transition-transform" />
-          </Link>
-          <a
-            href="#demo"
-            className="inline-flex items-center gap-2 font-display font-600 text-sm px-6 py-4 rounded-xl border border-border text-text hover:border-mint/30 hover:text-mint transition-all duration-200"
-          >
-            See a Demo
-          </a>
-        </div>
-
-        <p className="font-mono text-xs text-muted/60 mb-12">
-          1 free prediction · No credit card required
-        </p>
-
-        {/* Prompt form */}
+        {/* Prompt form — full width below the two columns */}
         <div className="max-w-2xl mx-auto">
           <p className="font-mono text-xs text-muted uppercase tracking-widest mb-3 text-left">
             Or ask a question right now
