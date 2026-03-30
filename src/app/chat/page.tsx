@@ -294,7 +294,7 @@ function ChatWorkspace() {
       body.append('message', text);
       if (file) body.append('file', file);
 
-      const res = await fetch(`${API_URL}/api/chat`, {
+      const res = await fetch(`${API_URL}/api/report/chat`, {
         method: 'POST',
         body,
         signal: ac.signal,
