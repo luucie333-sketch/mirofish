@@ -22,7 +22,7 @@ export async function GET() {
   const service = createServiceClient();
   const { data, error } = await service
     .from('users')
-    .select('id, email, credits, role, created_at')
+    .select('id, email, credits, role, created_at, subscription_tier, subscription_expires_at')
     .order('created_at', { ascending: false });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

@@ -1,19 +1,22 @@
 'use client';
 
 import { useState } from 'react';
-import { X, Zap } from 'lucide-react';
-import { CREDIT_PACKAGES } from '@/lib/credits';
+import { X, Zap, Infinity, Star } from 'lucide-react';
+import { CREDIT_PACKAGES, SUBSCRIPTION_PLAN } from '@/lib/credits';
 import { useCredits } from '@/components/providers/CreditsProvider';
 import PackageCard from './PackageCard';
 import PayPalCheckout from './PayPalCheckout';
 import CryptoPayment from './CryptoPayment';
+import SubscriptionCheckout from './SubscriptionCheckout';
 
 type Tab = 'paypal' | 'crypto';
+type Mode = 'subscription' | 'credits';
 
 export default function BuyCreditsModal() {
-  const { credits, showBuyModal, setShowBuyModal, refresh } = useCredits();
+  const { credits, showBuyModal, setShowBuyModal, refresh, isSubscribed, subscriptionExpires } = useCredits();
   const [selectedPackage, setSelectedPackage] = useState('pro');
   const [tab, setTab] = useState<Tab>('paypal');
+  const [mode, setMode] = useState<Mode>('credits');
   const [successMsg, setSuccessMsg] = useState('');
 
   if (!showBuyModal) return null;
@@ -34,14 +37,16 @@ export default function BuyCreditsModal() {
     setTimeout(handleClose, 3000);
   }
 
+  async function handleSubscriptionSuccess() {
+    await refresh();
+    setSuccessMsg('Subscription activated! Unlimited predictions for 30 days.');
+    setTimeout(handleClose, 2500);
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-bg/80 backdrop-blur-sm"
-        onClick={handleClose}
-        aria-hidden
-      />
+      <div className="absolute inset-0 bg-bg/80 backdrop-blur-sm" onClick={handleClose} aria-hidden />
 
       {/* Modal */}
       <div className="relative w-full max-w-md bg-surface border border-border rounded-2xl shadow-card overflow-hidden">
@@ -60,12 +65,21 @@ export default function BuyCreditsModal() {
           </button>
         </div>
 
-        <div className="p-6 space-y-5">
+        <div className="p-6 space-y-4">
           {/* Current balance */}
           {credits !== null && (
             <p className="font-mono text-xs text-muted text-center">
-              Current balance:{' '}
-              <span className="text-mint font-600">{credits} credit{credits !== 1 ? 's' : ''}</span>
+              {isSubscribed ? (
+                <>
+                  <span className="text-mint">∞ Unlimited</span> plan active —{' '}
+                  expires {new Date(subscriptionExpires!).toLocaleDateString()}
+                </>
+              ) : (
+                <>
+                  Current balance:{' '}
+                  <span className="text-mint font-600">{credits} credit{credits !== 1 ? 's' : ''}</span>
+                </>
+              )}
             </p>
           )}
 
@@ -78,50 +92,102 @@ export default function BuyCreditsModal() {
 
           {!successMsg && (
             <>
-              {/* Package cards */}
-              <div className="grid grid-cols-3 gap-2">
+              {/* ── Subscription card (featured) ── */}
+              <button
+                type="button"
+                onClick={() => setMode('subscription')}
+                className={`w-full text-left rounded-xl border-2 p-4 transition-all ${
+                  mode === 'subscription'
+                    ? 'border-mint bg-mint/10'
+                    : 'border-mint/30 bg-mint/5 hover:border-mint/50 hover:bg-mint/10'
+                }`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <Infinity className="w-4 h-4 text-mint shrink-0" />
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-display font-600 text-bright text-sm">
+                          {SUBSCRIPTION_PLAN.label}
+                        </span>
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-mint/20 border border-mint/30 font-mono text-[10px] text-mint">
+                          <Star className="w-2.5 h-2.5" />
+                          Best value
+                        </span>
+                      </div>
+                      <p className="font-mono text-xs text-muted mt-0.5">{SUBSCRIPTION_PLAN.description}</p>
+                    </div>
+                  </div>
+                  <span className="font-display font-700 text-mint text-base shrink-0">
+                    ${SUBSCRIPTION_PLAN.price}<span className="font-mono text-xs text-muted">/mo</span>
+                  </span>
+                </div>
+                {isSubscribed && (
+                  <p className="font-mono text-xs text-mint/70 mt-2">
+                    ✓ Active — renew to extend by 30 more days
+                  </p>
+                )}
+              </button>
+
+              {/* ── Divider ── */}
+              <div className="flex items-center gap-3">
+                <div className="flex-1 h-px bg-border" />
+                <span className="font-mono text-xs text-muted">or buy credits</span>
+                <div className="flex-1 h-px bg-border" />
+              </div>
+
+              {/* ── Credit package cards ── */}
+              <div className={`grid grid-cols-3 gap-2 transition-opacity ${isSubscribed ? 'opacity-50' : ''}`}>
                 {CREDIT_PACKAGES.map((pkg) => (
                   <PackageCard
                     key={pkg.id}
                     pkg={pkg}
-                    selected={selectedPackage === pkg.id}
-                    onSelect={() => setSelectedPackage(pkg.id)}
+                    selected={mode === 'credits' && selectedPackage === pkg.id}
+                    onSelect={() => { setMode('credits'); setSelectedPackage(pkg.id); }}
                   />
                 ))}
               </div>
+              {isSubscribed && (
+                <p className="font-mono text-xs text-muted/60 text-center -mt-1">
+                  You have unlimited access — credits usable after subscription expires
+                </p>
+              )}
 
-              {/* Payment tabs */}
-              <div className="flex gap-1 p-1 bg-card rounded-xl">
-                {(['paypal', 'crypto'] as Tab[]).map((t) => (
-                  <button
-                    key={t}
-                    type="button"
-                    onClick={() => setTab(t)}
-                    className={`flex-1 py-2 rounded-lg font-display font-600 text-xs transition-all ${
-                      tab === t
-                        ? 'bg-surface text-bright shadow-card'
-                        : 'text-muted hover:text-text'
-                    }`}
-                  >
-                    {t === 'paypal' ? 'PayPal' : 'Crypto'}
-                  </button>
-                ))}
-              </div>
+              {/* ── Payment area ── */}
+              {mode === 'subscription' ? (
+                <div className="min-h-[140px]">
+                  <SubscriptionCheckout onSuccess={handleSubscriptionSuccess} />
+                </div>
+              ) : (
+                <>
+                  {/* Payment tabs */}
+                  <div className="flex gap-1 p-1 bg-card rounded-xl">
+                    {(['paypal', 'crypto'] as Tab[]).map((t) => (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => setTab(t)}
+                        className={`flex-1 py-2 rounded-lg font-display font-600 text-xs transition-all ${
+                          tab === t
+                            ? 'bg-surface text-bright shadow-card'
+                            : 'text-muted hover:text-text'
+                        }`}
+                      >
+                        {t === 'paypal' ? 'PayPal' : 'Crypto'}
+                      </button>
+                    ))}
+                  </div>
 
-              {/* Payment content */}
-              <div className="min-h-[160px]">
-                {tab === 'paypal' ? (
-                  <PayPalCheckout
-                    packageId={selectedPackage}
-                    onSuccess={handlePayPalSuccess}
-                  />
-                ) : (
-                  <CryptoPayment
-                    packageId={selectedPackage}
-                    onSuccess={handleCryptoSuccess}
-                  />
-                )}
-              </div>
+                  {/* Payment content */}
+                  <div className="min-h-[160px]">
+                    {tab === 'paypal' ? (
+                      <PayPalCheckout packageId={selectedPackage} onSuccess={handlePayPalSuccess} />
+                    ) : (
+                      <CryptoPayment packageId={selectedPackage} onSuccess={handleCryptoSuccess} />
+                    )}
+                  </div>
+                </>
+              )}
             </>
           )}
         </div>

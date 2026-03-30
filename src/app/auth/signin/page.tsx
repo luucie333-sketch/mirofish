@@ -8,12 +8,35 @@ import { Mail, ArrowLeft, Zap } from 'lucide-react';
 export default function SignInPage() {
   const [email, setEmail] = useState('');
   const [status, setStatus] = useState<'idle' | 'loading' | 'sent' | 'error'>('idle');
+  const [errorMsg, setErrorMsg] = useState('');
   const supabase = createClient();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!email.trim()) return;
     setStatus('loading');
+    setErrorMsg('');
+
+    // Check if this IP can create a new account (existing users always pass)
+    try {
+      const ipCheck = await fetch('/api/auth/check-ip', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim() }),
+      });
+      const { blocked, message } = await ipCheck.json();
+
+      if (blocked) {
+        setErrorMsg(
+          message ??
+            'An account was already created from this network. Please sign in with your existing email.'
+        );
+        setStatus('error');
+        return;
+      }
+    } catch {
+      // IP check failure is non-fatal — proceed with sign-in
+    }
 
     const { error } = await supabase.auth.signInWithOtp({
       email: email.trim(),
@@ -22,7 +45,12 @@ export default function SignInPage() {
       },
     });
 
-    setStatus(error ? 'error' : 'sent');
+    if (error) {
+      setErrorMsg('Something went wrong. Please try again.');
+      setStatus('error');
+    } else {
+      setStatus('sent');
+    }
   }
 
   return (
@@ -93,8 +121,8 @@ export default function SignInPage() {
                 </div>
 
                 {status === 'error' && (
-                  <p className="text-coral text-xs font-mono">
-                    Something went wrong. Please try again.
+                  <p className="text-coral text-xs font-mono leading-relaxed">
+                    {errorMsg || 'Something went wrong. Please try again.'}
                   </p>
                 )}
 

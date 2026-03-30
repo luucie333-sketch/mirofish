@@ -173,7 +173,13 @@ async function postJson(url: string, body: object): Promise<any> {
 async function postFormData(url: string, data: { simulation_requirement: string; files: File[] }): Promise<any> {
   const fd = new FormData();
   fd.append('simulation_requirement', data.simulation_requirement);
-  data.files.forEach((f) => fd.append('files', f));
+  if (data.files.length > 0) {
+    data.files.forEach((f) => fd.append('files', f));
+  } else {
+    // Backend requires at least one file — synthesize one from the prompt text
+    const blob = new Blob([data.simulation_requirement], { type: 'text/plain' });
+    fd.append('files', blob, 'prompt.txt');
+  }
   const res = await fetch(url, { method: 'POST', body: fd });
   if (!res.ok) throw new Error(`${url} returned ${res.status}`);
   return res.json();
@@ -266,16 +272,16 @@ function ChatWorkspace() {
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-  const { credits, refresh: refreshCredits, setShowBuyModal } = useCredits();
+  const { credits, isSubscribed, subscriptionExpires, refresh: refreshCredits, setShowBuyModal } = useCredits();
 
   useEffect(() => { document.title = 'Chat Workspace | MiroFish'; }, []);
   useEffect(() => { setSidebarOpen(window.innerWidth > 768); }, []);
 
   useEffect(() => {
-    if (credits === 0) {
+    if (credits === 0 && !isSubscribed) {
       setShowBuyModal(true);
     }
-  }, [credits, setShowBuyModal]);
+  }, [credits, isSubscribed, setShowBuyModal]);
 
   useEffect(() => {
     const p = searchParams.get('prompt');
@@ -322,7 +328,7 @@ function ChatWorkspace() {
       const authCheck = await fetch('/api/credits/balance');
       if (authCheck.status === 401) { router.push('/auth/signin'); return; }
     }
-    if (credits === 0) {
+    if (!isSubscribed && credits === 0) {
       setOutOfCredits(true);
       setShowBuyModal(true);
       showToast("You're out of credits. Top up to continue.");
@@ -503,7 +509,7 @@ function ChatWorkspace() {
         setIsLoading(false);
       }
     }
-  }, [input, isLoading, credits, file, pipelineComplete, simulationId, chatHistory, updateStage, router, refreshCredits, setShowBuyModal]);
+  }, [input, isLoading, credits, isSubscribed, file, pipelineComplete, simulationId, chatHistory, updateStage, router, refreshCredits, setShowBuyModal]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
@@ -570,13 +576,15 @@ function ChatWorkspace() {
               onClick={() => setShowBuyModal(true)}
               className={cn(
                 'inline-flex items-center gap-1 font-mono text-xs px-2.5 py-1 rounded-full border transition-all',
-                credits === 0
+                isSubscribed
+                  ? 'border-mint/30 bg-mint/10 text-mint hover:bg-mint/20'
+                  : credits === 0
                   ? 'border-coral/30 bg-coral/10 text-coral'
                   : 'border-mint/20 bg-mint/5 text-mint hover:bg-mint/10'
               )}
             >
-              {credits === 0 ? <Lock className="w-3 h-3" /> : <Zap className="w-3 h-3" />}
-              {credits}
+              {isSubscribed ? '∞' : credits === 0 ? <Lock className="w-3 h-3" /> : <Zap className="w-3 h-3" />}
+              {isSubscribed ? 'Unlimited' : credits}
             </button>
           )}
 
@@ -595,12 +603,19 @@ function ChatWorkspace() {
         {credits !== null && (
           <div className={cn(
             'flex items-center justify-between px-4 py-2 border-b text-xs font-mono transition-colors shrink-0',
-            credits === 0
+            isSubscribed
+              ? 'bg-mint/5 border-mint/10 text-muted'
+              : credits === 0
               ? 'bg-coral/10 border-coral/30 text-coral'
               : 'bg-mint/5 border-mint/10 text-muted'
           )}>
             <span>
-              {credits === 0
+              {isSubscribed
+                ? <>
+                    <span className="text-mint">∞ Unlimited</span> plan active —{' '}
+                    expires {new Date(subscriptionExpires!).toLocaleDateString()}
+                  </>
+                : credits === 0
                 ? '⚡ No credits remaining — buy credits to send messages'
                 : <><span className="text-mint">⚡ {credits}</span> credit{credits !== 1 ? 's' : ''} remaining</>
               }
@@ -609,12 +624,12 @@ function ChatWorkspace() {
               onClick={() => setShowBuyModal(true)}
               className={cn(
                 'px-2.5 py-1 rounded-full border text-[10px] font-600 transition-colors',
-                credits === 0
+                !isSubscribed && credits === 0
                   ? 'border-coral/40 bg-coral/10 text-coral hover:bg-coral/20'
                   : 'border-mint/20 bg-mint/5 text-mint hover:bg-mint/10'
               )}
             >
-              Buy Credits
+              {isSubscribed ? 'Renew' : 'Buy Credits'}
             </button>
           </div>
         )}
@@ -647,7 +662,7 @@ function ChatWorkspace() {
 
           <div className={cn(
             'relative rounded-xl border bg-surface p-2 focus-within:border-mint/40 transition-colors',
-            outOfCredits && credits === 0 ? 'border-coral/30' : 'border-border'
+            outOfCredits && credits === 0 && !isSubscribed ? 'border-coral/30' : 'border-border'
           )}>
             {file && (
               <div className="mb-2 px-2">

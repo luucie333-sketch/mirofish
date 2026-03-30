@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import {
-  ChevronLeft, Users, Bitcoin, Check, X, RefreshCw, Zap, Shield,
+  ChevronLeft, Users, Bitcoin, Check, X, RefreshCw, Zap, Shield, CalendarCheck,
 } from 'lucide-react';
 
 interface UserRow {
@@ -14,6 +14,8 @@ interface UserRow {
   credits: number;
   role: string;
   created_at: string;
+  subscription_tier: string | null;
+  subscription_expires_at: string | null;
 }
 
 interface CryptoRequest {
@@ -33,6 +35,14 @@ function explorerUrl(type: string, hash: string): string {
   if (type === 'ETH') return `https://etherscan.io/tx/${hash}`;
   if (type === 'USDT') return `https://tronscan.org/#/transaction/${hash}`;
   return '#';
+}
+
+function isActiveSub(user: UserRow): boolean {
+  return (
+    user.subscription_tier === 'unlimited' &&
+    !!user.subscription_expires_at &&
+    new Date(user.subscription_expires_at) > new Date()
+  );
 }
 
 function TopUpInput({ userId, onTopUp }: { userId: string; onTopUp: () => void }) {
@@ -73,6 +83,33 @@ function TopUpInput({ userId, onTopUp }: { userId: string; onTopUp: () => void }
   );
 }
 
+function GrantSubscriptionButton({ userId, onGrant }: { userId: string; onGrant: () => void }) {
+  const [loading, setLoading] = useState(false);
+
+  async function grant() {
+    setLoading(true);
+    await fetch('/api/admin/grant-subscription', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId }),
+    });
+    setLoading(false);
+    onGrant();
+  }
+
+  return (
+    <button
+      onClick={grant}
+      disabled={loading}
+      className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-periwinkle/10 border border-periwinkle/20 text-periwinkle font-mono text-xs hover:bg-periwinkle/20 transition-colors disabled:opacity-40"
+      title="Grant 30-day unlimited subscription"
+    >
+      <CalendarCheck className="w-3 h-3" />
+      {loading ? '…' : 'Grant Sub'}
+    </button>
+  );
+}
+
 export default function AdminPage() {
   const router = useRouter();
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
@@ -94,7 +131,7 @@ export default function AdminPage() {
     if (role !== 'admin') { router.push('/'); return; }
     setIsAdmin(true);
   }, [supabase, router]);
-  
+
   const fetchUsers = useCallback(async () => {
     const res = await fetch('/api/admin/users');
     if (res.ok) {
@@ -210,7 +247,7 @@ export default function AdminPage() {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-border">
-                  {['Email', 'Credits', 'Role', 'Joined', 'Top Up'].map((h) => (
+                  {['Email', 'Credits', 'Subscription', 'Role', 'Joined', 'Top Up', 'Actions'].map((h) => (
                     <th key={h} className="px-4 py-3 text-left font-mono text-xs text-muted uppercase tracking-widest">
                       {h}
                     </th>
@@ -218,33 +255,50 @@ export default function AdminPage() {
                 </tr>
               </thead>
               <tbody>
-                {users.map((u) => (
-                  <tr key={u.id} className="border-b border-border/50 hover:bg-card/50 transition-colors">
-                    <td className="px-4 py-3 font-mono text-xs text-text">{u.email}</td>
-                    <td className="px-4 py-3">
-                      <span className="inline-flex items-center gap-1 font-mono text-xs text-mint">
-                        <Zap className="w-3 h-3" />{u.credits}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`font-mono text-xs px-2 py-0.5 rounded-full border ${
-                        u.role === 'admin'
-                          ? 'border-mint/30 bg-mint/10 text-mint'
-                          : 'border-border text-muted'
-                      }`}>
-                        {u.role}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 font-mono text-xs text-muted">
-                      {new Date(u.created_at).toLocaleDateString()}
-                    </td>
-                    <td className="px-4 py-3">
-                      <TopUpInput userId={u.id} onTopUp={fetchUsers} />
-                    </td>
-                  </tr>
-                ))}
+                {users.map((u) => {
+                  const active = isActiveSub(u);
+                  return (
+                    <tr key={u.id} className="border-b border-border/50 hover:bg-card/50 transition-colors">
+                      <td className="px-4 py-3 font-mono text-xs text-text">{u.email}</td>
+                      <td className="px-4 py-3">
+                        <span className="inline-flex items-center gap-1 font-mono text-xs text-mint">
+                          <Zap className="w-3 h-3" />{u.credits}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        {active ? (
+                          <span className="font-mono text-xs text-mint">
+                            ∞ until {new Date(u.subscription_expires_at!).toLocaleDateString()}
+                          </span>
+                        ) : u.subscription_tier ? (
+                          <span className="font-mono text-xs text-muted">Expired</span>
+                        ) : (
+                          <span className="font-mono text-xs text-muted/50">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`font-mono text-xs px-2 py-0.5 rounded-full border ${
+                          u.role === 'admin'
+                            ? 'border-mint/30 bg-mint/10 text-mint'
+                            : 'border-border text-muted'
+                        }`}>
+                          {u.role}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 font-mono text-xs text-muted">
+                        {new Date(u.created_at).toLocaleDateString()}
+                      </td>
+                      <td className="px-4 py-3">
+                        <TopUpInput userId={u.id} onTopUp={fetchUsers} />
+                      </td>
+                      <td className="px-4 py-3">
+                        <GrantSubscriptionButton userId={u.id} onGrant={fetchUsers} />
+                      </td>
+                    </tr>
+                  );
+                })}
                 {users.length === 0 && (
-                  <tr><td colSpan={5} className="px-4 py-8 text-center font-mono text-xs text-muted">No users yet</td></tr>
+                  <tr><td colSpan={7} className="px-4 py-8 text-center font-mono text-xs text-muted">No users yet</td></tr>
                 )}
               </tbody>
             </table>

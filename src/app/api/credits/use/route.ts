@@ -11,15 +11,28 @@ export async function POST() {
 
   const { data: userData } = await supabase
     .from('users')
-    .select('credits')
+    .select('credits, subscription_tier, subscription_expires_at')
     .eq('id', user.id)
     .single();
 
-  if (!userData || userData.credits < 1) {
+  if (!userData) {
+    return NextResponse.json({ error: 'User not found' }, { status: 404 });
+  }
+
+  // Active subscription — allow message without deducting credits
+  if (
+    userData.subscription_tier === 'unlimited' &&
+    userData.subscription_expires_at &&
+    new Date(userData.subscription_expires_at) > new Date()
+  ) {
+    return NextResponse.json({ credits: userData.credits, subscription: true });
+  }
+
+  // No active subscription — deduct credit
+  if (userData.credits < 1) {
     return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 });
   }
 
-  // Use service client to bypass RLS for the update
   const service = createServiceClient();
   const { data: updated, error } = await service
     .from('users')
@@ -32,7 +45,6 @@ export async function POST() {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  // Log transaction
   await service.from('transactions').insert({
     user_id: user.id,
     type: 'use',
