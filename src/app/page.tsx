@@ -74,7 +74,7 @@ function Header() {
   return (
     <header className={cn(
       'fixed top-0 inset-x-0 z-50 transition-all duration-300',
-      scrolled ? 'bg-bg/90 backdrop-blur-xl border-b border-border shadow-[0_1px_0_rgba(30,30,53,0.8)]' : 'bg-transparent'
+      scrolled ? 'bg-bg/90 backdrop-blur-xl border-b border-border shadow-[0_1px_0_rgba(0,0,0,0.06)]' : 'bg-transparent'
     )}>
       <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-2 select-none group">
@@ -475,7 +475,7 @@ function ExamplesSection({ onSelect }: { onSelect: (p: string) => void }) {
               key={category}
               className={cn(
                 'flex flex-col rounded-2xl border border-border bg-card overflow-hidden group transition-all duration-700',
-                'hover:border-mint/20 hover:-translate-y-1 hover:shadow-[0_8px_32px_rgba(0,0,0,0.5)]',
+                'hover:border-mint/20 hover:-translate-y-1 hover:shadow-[0_8px_32px_rgba(0,0,0,0.1)]',
                 inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
               )}
               style={{ transitionDelay: inView ? `${i * 120}ms` : '0ms' }}
