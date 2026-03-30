@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
 import UserMenu from '@/components/auth/UserMenu';
 import { CREDIT_PACKAGES, SUBSCRIPTION_PLAN } from '@/lib/credits';
+import DemoReport from '@/components/landing/DemoReport';
 
 /* ─── Scroll-in animation hook ─────────────────────────────────────────────── */
 function useInView(threshold = 0.12) {
@@ -85,8 +86,8 @@ function Header() {
         </Link>
 
         <nav className="hidden md:flex items-center gap-1">
+          <a href="#demo" className="text-sm px-4 py-2 rounded-lg text-muted hover:text-text transition-colors font-display font-500">Demo</a>
           <a href="#how-it-works" className="text-sm px-4 py-2 rounded-lg text-muted hover:text-text transition-colors font-display font-500">How It Works</a>
-          <a href="#examples" className="text-sm px-4 py-2 rounded-lg text-muted hover:text-text transition-colors font-display font-500">Examples</a>
           <a href="#pricing" className="text-sm px-4 py-2 rounded-lg text-muted hover:text-text transition-colors font-display font-500">Pricing</a>
           <a href="#faq" className="text-sm px-4 py-2 rounded-lg text-muted hover:text-text transition-colors font-display font-500">FAQ</a>
           <span className="w-px h-5 bg-border mx-1" />
@@ -101,7 +102,6 @@ function Header() {
           <UserMenu />
         </nav>
 
-        {/* Mobile: just UserMenu */}
         <div className="md:hidden">
           <UserMenu />
         </div>
@@ -125,11 +125,9 @@ function HeroSection({
 
   return (
     <section className="relative min-h-screen flex flex-col items-center justify-center px-6 pt-24 pb-24 overflow-hidden">
-      {/* Background layers */}
       <div className="absolute inset-0 bg-radial-mint pointer-events-none" aria-hidden />
       <div className="absolute inset-0 bg-radial-coral pointer-events-none" aria-hidden />
       <div className="absolute inset-0 bg-grid bg-[length:48px_48px] opacity-30 pointer-events-none" aria-hidden />
-      {/* Extra deep glow */}
       <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] bg-mint/5 rounded-full blur-[120px] pointer-events-none" aria-hidden />
 
       {isDragging && (
@@ -139,55 +137,53 @@ function HeroSection({
       )}
 
       <div className="relative z-10 max-w-4xl mx-auto text-center">
-        {/* Announcement pill */}
+        {/* Pill */}
         <div className="flex justify-center mb-8">
           <div className="inline-flex items-center gap-2.5 px-4 py-2 rounded-full border border-mint/20 bg-mint/5 backdrop-blur-sm">
             <span className="w-1.5 h-1.5 rounded-full bg-mint animate-pulse-slow" aria-hidden />
-            <span className="font-mono text-xs text-mint tracking-wide">Multi-Agent AI Simulation Engine · v0.1</span>
+            <span className="font-mono text-xs text-mint tracking-wide">Multi-Agent AI · v0.1 · Open Source</span>
           </div>
         </div>
 
         {/* Headline */}
         <h1 className="font-display font-800 text-4xl sm:text-5xl lg:text-6xl xl:text-7xl text-bright leading-[1.05] tracking-tight mb-6">
-          Predict How Any Scenario
+          See What Happens
           <span className="block mt-1" style={{ color: '#64FFDA', textShadow: '0 0 40px rgba(100,255,218,0.3)' }}>
-            Plays Out — Before It Happens
+            Before It Happens
           </span>
         </h1>
 
         {/* Subtext */}
         <p className="text-muted text-lg sm:text-xl leading-relaxed max-w-2xl mx-auto mb-10">
-          Type your scenario. MiroFish runs a full multi-agent simulation — analysing stakeholders,
-          building knowledge graphs, and generating a confidence-scored prediction report you can actually
-          interrogate in chat.
+          Ask any &ldquo;what if&rdquo; question. MiroFish runs thousands of AI agents through your scenario
+          and delivers a detailed prediction report. Try it free.
         </p>
 
-        {/* CTA row */}
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-12">
+        {/* CTAs */}
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-10">
           <Link
-            href="/chat"
+            href="/auth/signin"
             className="inline-flex items-center justify-center gap-2.5 font-display font-700 text-base px-8 py-4 rounded-xl bg-mint text-bg hover:bg-mint-dim shadow-glow-mint transition-all duration-200 group"
           >
-            Start Your First Prediction
+            Try It Free
             <ArrowRight className="w-5 h-5 group-hover:translate-x-0.5 transition-transform" />
           </Link>
           <a
-            href="#how-it-works"
+            href="#demo"
             className="inline-flex items-center gap-2 font-display font-600 text-sm px-6 py-4 rounded-xl border border-border text-text hover:border-mint/30 hover:text-mint transition-all duration-200"
           >
-            See how it works
+            See a Demo
           </a>
         </div>
 
-        {/* Trust micro-copy */}
-        <p className="font-mono text-xs text-muted/70 mb-12">
-          Free to try · 1 free prediction · No credit card required
+        <p className="font-mono text-xs text-muted/60 mb-12">
+          1 free prediction · No credit card required
         </p>
 
         {/* Prompt form */}
         <div className="max-w-2xl mx-auto">
           <p className="font-mono text-xs text-muted uppercase tracking-widest mb-3 text-left">
-            Or try it right now
+            Or ask a question right now
           </p>
           <form onSubmit={onSubmit}>
             <div className="relative rounded-2xl border border-border bg-surface/80 backdrop-blur-sm p-2 shadow-card focus-within:border-mint/40 transition-colors duration-200">
@@ -195,7 +191,7 @@ function HeroSection({
                 rows={3}
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
-                placeholder="e.g. 'If a product raises its price next quarter, how will customer sentiment evolve over six months?'"
+                placeholder="e.g. 'What happens if our competitor drops prices by 20% next quarter?'"
                 className="bg-transparent text-text placeholder:text-muted/50 resize-none w-full px-3 py-2 focus:outline-none font-body text-sm leading-relaxed"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
@@ -251,15 +247,24 @@ function HeroSection({
 
 /* ─── Social Proof Bar ──────────────────────────────────────────────────────── */
 function SocialProofBar() {
+  const [userCount, setUserCount] = useState<number>(120);
+
+  useEffect(() => {
+    fetch('/api/stats')
+      .then((r) => r.ok ? r.json() : null)
+      .then((d) => { if (d?.users) setUserCount(d.users); })
+      .catch(() => {});
+  }, []);
+
   return (
-    <div className="border-y border-border bg-surface/50 backdrop-blur-sm py-5">
-      <div className="max-w-7xl mx-auto px-6">
+    <div className="border-y border-border bg-surface/50 backdrop-blur-sm">
+      <div className="max-w-7xl mx-auto px-6 py-5">
         <div className="flex flex-wrap items-center justify-center gap-8 sm:gap-16">
           {[
-            { icon: <Users className="w-4 h-4 text-mint" />, label: '120+ users already predicting' },
+            { icon: <Users className="w-4 h-4 text-mint" />, label: `${userCount}+ users already predicting` },
             { icon: <Shield className="w-4 h-4 text-periwinkle" />, label: 'Powered by multi-agent AI' },
             { icon: <TrendingUp className="w-4 h-4 text-coral" />, label: 'Real simulation — not just LLM output' },
-            { icon: <Lock className="w-4 h-4 text-amber" />, label: 'Your data stays private' },
+            { icon: <Lock className="w-4 h-4 text-amber" />, label: 'Private & secure' },
           ].map(({ icon, label }) => (
             <div key={label} className="flex items-center gap-2">
               {icon}
@@ -267,8 +272,37 @@ function SocialProofBar() {
             </div>
           ))}
         </div>
+        {/* "Trusted by" line */}
+        <p className="text-center font-mono text-[11px] text-muted/40 mt-4">
+          Trusted by users from Google, Amazon, Microsoft, universities, and startups worldwide
+        </p>
       </div>
     </div>
+  );
+}
+
+/* ─── Demo Section ──────────────────────────────────────────────────────────── */
+function DemoSection() {
+  const { ref, inView } = useInView(0.08);
+  return (
+    <section id="demo" className="relative py-24 px-6">
+      <div className="absolute inset-0 bg-surface/30 pointer-events-none" aria-hidden />
+      <div className="max-w-3xl mx-auto relative" ref={ref}>
+        <div className={cn('text-center mb-10 transition-all duration-700', inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6')}>
+          <p className="font-mono text-xs text-mint uppercase tracking-[0.2em] mb-4">See a Real Prediction</p>
+          <h2 className="font-display font-800 text-3xl sm:text-4xl lg:text-5xl text-bright mb-5">
+            This is what you get
+          </h2>
+          <p className="text-muted text-lg max-w-xl mx-auto leading-relaxed">
+            A real simulation MiroFish ran. Explore the sections — this is exactly what your report looks like.
+          </p>
+        </div>
+
+        <div className={cn('transition-all duration-700 delay-200', inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8')}>
+          <DemoReport />
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -277,8 +311,8 @@ const STEPS = [
   {
     num: '01',
     icon: <Brain className="w-6 h-6" />,
-    title: 'Seed Analysis',
-    desc: 'Your scenario is decomposed into predictive parameters, key entities, and causal relationships through ontology generation.',
+    title: 'Ask a Question',
+    desc: 'Type any "what if" scenario, like you\'re asking a friend. No templates, no jargon.',
     color: 'mint',
     bgColor: 'bg-mint/10',
     borderColor: 'border-mint/20',
@@ -287,8 +321,8 @@ const STEPS = [
   {
     num: '02',
     icon: <GitBranch className="w-6 h-6" />,
-    title: 'Graph Building',
-    desc: 'A structured knowledge graph maps every stakeholder, influence, and feedback loop within your scenario.',
+    title: 'We Build the World',
+    desc: 'AI creates a realistic model with companies, people, and organisations from your scenario.',
     color: 'periwinkle',
     bgColor: 'bg-periwinkle/10',
     borderColor: 'border-periwinkle/20',
@@ -297,8 +331,8 @@ const STEPS = [
   {
     num: '03',
     icon: <Bot className="w-6 h-6" />,
-    title: 'Multi-Agent Simulation',
-    desc: 'Independent AI agents simulate competing viewpoints, market forces, and human behaviours across multiple rounds.',
+    title: 'Agents Simulate',
+    desc: 'Thousands of AI agents debate, react, and interact — just like real people would.',
     color: 'coral',
     bgColor: 'bg-coral/10',
     borderColor: 'border-coral/20',
@@ -307,8 +341,8 @@ const STEPS = [
   {
     num: '04',
     icon: <BarChart3 className="w-6 h-6" />,
-    title: 'Prediction Report',
-    desc: 'A confidence-scored structured report is generated with actionable insights — then you can chat with it to go deeper.',
+    title: 'Get Your Report',
+    desc: 'A detailed prediction report with insights, quotes, and actionable takeaways — plus follow-up chat.',
     color: 'amber',
     bgColor: 'bg-amber/10',
     borderColor: 'border-amber/20',
@@ -324,15 +358,14 @@ function HowItWorksSection() {
         <div className={cn('text-center mb-16 transition-all duration-700', inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6')}>
           <p className="font-mono text-xs text-mint uppercase tracking-[0.2em] mb-4">How It Works</p>
           <h2 className="font-display font-800 text-3xl sm:text-4xl lg:text-5xl text-bright mb-5">
-            From question to prediction<br className="hidden sm:block" /> in minutes
+            Four steps. Ten minutes.<br className="hidden sm:block" /> A prediction report.
           </h2>
           <p className="text-muted text-lg max-w-xl mx-auto leading-relaxed">
-            Not just an LLM generating text. A full simulation pipeline that models cause and effect.
+            No PhD required. Just ask your question and let the simulation run.
           </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 lg:gap-6 relative">
-          {/* Connecting line on desktop */}
           <div className="hidden md:block absolute top-10 left-[12.5%] right-[12.5%] h-px bg-gradient-to-r from-mint/30 via-periwinkle/30 via-coral/30 to-amber/30 pointer-events-none" aria-hidden />
 
           {STEPS.map(({ num, icon, title, desc, bgColor, borderColor, textColor }, i) => (
@@ -406,12 +439,12 @@ function ExamplesSection({ onSelect }: { onSelect: (p: string) => void }) {
       <div className="absolute inset-0 bg-surface/40 pointer-events-none" aria-hidden />
       <div className="max-w-7xl mx-auto relative" ref={ref}>
         <div className={cn('text-center mb-16 transition-all duration-700', inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6')}>
-          <p className="font-mono text-xs text-mint uppercase tracking-[0.2em] mb-4">See It In Action</p>
+          <p className="font-mono text-xs text-mint uppercase tracking-[0.2em] mb-4">More Examples</p>
           <h2 className="font-display font-800 text-3xl sm:text-4xl lg:text-5xl text-bright mb-5">
-            Real predictions, real depth
+            Ask anything. Get a real answer.
           </h2>
           <p className="text-muted text-lg max-w-xl mx-auto leading-relaxed">
-            Each prediction runs a full simulation. Here&apos;s a preview of what the reports look like.
+            Click any scenario below to try it yourself.
           </p>
         </div>
 
@@ -426,7 +459,6 @@ function ExamplesSection({ onSelect }: { onSelect: (p: string) => void }) {
               )}
               style={{ transitionDelay: inView ? `${i * 120}ms` : '0ms' }}
             >
-              {/* Card header */}
               <div className="p-5 border-b border-border">
                 <span className={cn('inline-flex items-center font-mono text-xs px-2.5 py-1 rounded-full border mb-3', categoryColor)}>
                   {category}
@@ -434,7 +466,6 @@ function ExamplesSection({ onSelect }: { onSelect: (p: string) => void }) {
                 <p className="font-body text-sm text-text leading-relaxed line-clamp-3">{prompt}</p>
               </div>
 
-              {/* Report preview */}
               <div className="flex-1 p-5 space-y-3">
                 <p className="font-mono text-[10px] text-muted uppercase tracking-widest mb-4">Report Preview</p>
                 {insights.map(({ label, value, color }) => (
@@ -445,7 +476,6 @@ function ExamplesSection({ onSelect }: { onSelect: (p: string) => void }) {
                 ))}
               </div>
 
-              {/* Confidence + CTA */}
               <div className="p-5 border-t border-border flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <div className="w-20 h-1.5 rounded-full bg-border overflow-hidden">
@@ -471,6 +501,14 @@ function ExamplesSection({ onSelect }: { onSelect: (p: string) => void }) {
 }
 
 /* ─── Pricing ───────────────────────────────────────────────────────────────── */
+const PLAN_FEATURES = [
+  'Full simulation pipeline',
+  'Downloadable PDF report',
+  'Follow-up chat included',
+  'Chat history saved',
+  'File attachments (PDF/MD/TXT)',
+];
+
 function PricingSection() {
   const { ref, inView } = useInView();
   return (
@@ -480,39 +518,46 @@ function PricingSection() {
         <div className={cn('text-center mb-16 transition-all duration-700', inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6')}>
           <p className="font-mono text-xs text-mint uppercase tracking-[0.2em] mb-4">Pricing</p>
           <h2 className="font-display font-800 text-3xl sm:text-4xl lg:text-5xl text-bright mb-5">
-            Simple, transparent pricing
+            Simple, fair pricing
           </h2>
           <p className="text-muted text-lg max-w-xl mx-auto leading-relaxed">
-            Pay per prediction or go unlimited. Start free — no credit card required.
+            Start with 1 free credit. No credit card required.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-5">
-          {/* Subscription — spans first or last, featured */}
-          <div className="lg:col-span-1 lg:order-last flex flex-col rounded-2xl border border-mint/30 bg-gradient-to-b from-mint/8 to-card relative overflow-hidden">
+        {/* 4-column grid: subscription + 3 packages */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-10">
+          {/* Unlimited plan — first / highlighted */}
+          <div
+            className={cn(
+              'flex flex-col rounded-2xl border border-mint/30 bg-gradient-to-b from-mint/8 to-card relative overflow-hidden transition-all duration-700',
+              inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'
+            )}
+            style={{ transitionDelay: inView ? '0ms' : '0ms' }}
+          >
             <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-mint/60 to-transparent" aria-hidden />
             <div className="p-6 flex-1">
               <div className="flex items-center justify-between mb-4">
                 <span className="font-display font-700 text-bright text-base">{SUBSCRIPTION_PLAN.label}</span>
                 <span className="inline-flex items-center gap-1 font-mono text-xs px-2 py-0.5 rounded-full bg-mint/15 border border-mint/25 text-mint">
                   <Star className="w-2.5 h-2.5 fill-mint" />
-                  Best value
+                  Best Value
                 </span>
               </div>
-              <div className="flex items-end gap-1 mb-2">
+              <div className="flex items-end gap-1 mb-1">
                 <span className="font-display font-800 text-4xl text-bright">${SUBSCRIPTION_PLAN.price}</span>
                 <span className="font-mono text-xs text-muted mb-1.5">/month</span>
               </div>
-              <p className="font-body text-sm text-muted mb-6">{SUBSCRIPTION_PLAN.description}</p>
-              <ul className="space-y-2.5">
-                {[
-                  'Unlimited predictions',
-                  'Priority simulation slots',
-                  'Full report history',
-                  'Chat with any past report',
-                  'Cancel anytime',
-                ].map((f) => (
-                  <li key={f} className="flex items-center gap-2.5">
+              <p className="font-body text-sm text-muted mb-6">Unlimited predictions for 30 days</p>
+              <ul className="space-y-2">
+                <li className="flex items-center gap-2">
+                  <div className="w-4 h-4 rounded-full bg-mint/15 flex items-center justify-center shrink-0">
+                    <Check className="w-2.5 h-2.5 text-mint" />
+                  </div>
+                  <span className="font-body text-sm text-text font-semibold">Unlimited predictions</span>
+                </li>
+                {PLAN_FEATURES.map((f) => (
+                  <li key={f} className="flex items-center gap-2">
                     <div className="w-4 h-4 rounded-full bg-mint/15 flex items-center justify-center shrink-0">
                       <Check className="w-2.5 h-2.5 text-mint" />
                     </div>
@@ -523,7 +568,7 @@ function PricingSection() {
             </div>
             <div className="p-5">
               <Link
-                href="/chat"
+                href="/auth/signin"
                 className="flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-mint text-bg font-display font-700 text-sm hover:bg-mint-dim shadow-glow-mint transition-all duration-200"
               >
                 <Sparkles className="w-4 h-4" />
@@ -543,7 +588,7 @@ function PricingSection() {
                   'hover:border-mint/20 hover:-translate-y-0.5',
                   inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'
                 )}
-                style={{ transitionDelay: inView ? `${i * 80}ms` : '0ms' }}
+                style={{ transitionDelay: inView ? `${(i + 1) * 80}ms` : '0ms' }}
               >
                 <div className="p-6 flex-1">
                   <div className="mb-4">
@@ -561,10 +606,8 @@ function PricingSection() {
                   </div>
                   <ul className="space-y-2">
                     {[
-                      `${pkg.credits} simulations`,
-                      'Full pipeline per run',
-                      'Report + chat included',
-                      'Credits never expire',
+                      `${pkg.credits} predictions`,
+                      ...PLAN_FEATURES,
                     ].map((f) => (
                       <li key={f} className="flex items-center gap-2">
                         <Check className="w-3.5 h-3.5 text-muted shrink-0" />
@@ -575,7 +618,7 @@ function PricingSection() {
                 </div>
                 <div className="p-5">
                   <Link
-                    href="/chat"
+                    href="/auth/signin"
                     className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl border border-border text-text font-display font-600 text-sm hover:border-mint/30 hover:text-mint transition-all duration-200"
                   >
                     Buy Credits
@@ -586,9 +629,8 @@ function PricingSection() {
           })}
         </div>
 
-        {/* Free tier note */}
-        <p className="text-center font-mono text-xs text-muted mt-8">
-          Everyone gets <span className="text-mint">1 free prediction</span> on signup. No credit card required.
+        <p className="text-center font-mono text-xs text-muted">
+          Everyone starts with <span className="text-mint">1 free prediction</span> — no credit card, no commitment.
         </p>
       </div>
     </section>
@@ -598,24 +640,28 @@ function PricingSection() {
 /* ─── FAQ ───────────────────────────────────────────────────────────────────── */
 const FAQ_ITEMS = [
   {
-    q: 'How many free predictions do I get?',
-    a: 'Every new account gets 1 free prediction credit at sign-up — no payment information required. After that you can buy credit packs starting at $2.99 or subscribe for unlimited access at $29.99/month.',
+    q: 'Is MiroFish free to try?',
+    a: "Yes! Every new account gets 1 free prediction credit — no credit card required. See a real prediction before you decide to buy more.",
   },
   {
-    q: 'What kinds of questions can MiroFish predict?',
-    a: 'Any scenario involving cause-and-effect dynamics: business strategy, market behaviour, organisational change, policy impact, technology adoption, or competitive dynamics. The more specific your question, the better the simulation.',
+    q: 'What kind of questions can I ask?',
+    a: "Anything! Market predictions, policy impacts, brand reputation scenarios, competitive analysis, social media trends, economic forecasts. If you can ask 'what if,' MiroFish can predict it.",
   },
   {
     q: 'How accurate are the predictions?',
-    a: 'MiroFish generates confidence-scored outputs, not deterministic forecasts. Accuracy depends on scenario complexity and how well it maps to known causal patterns. Reports include confidence percentages and uncertainty ranges so you always know the limits.',
+    a: "MiroFish uses multi-agent simulation — thousands of AI agents debate and react to your scenario like real stakeholders would. While no prediction is guaranteed, our reports surface insights, risks, and opportunities you'd miss on your own.",
   },
   {
     q: 'How long does a prediction take?',
-    a: 'Typically 2–10 minutes for a full simulation. Complex scenarios with many agents and rounds can take up to 30 minutes. You\'ll see real-time progress in the pipeline sidebar as each stage completes.',
+    a: "Most predictions complete in 10–20 minutes. You'll see real-time progress as the pipeline runs through seed analysis, graph building, simulation, and report generation.",
   },
   {
-    q: 'Can I attach my own documents to seed the analysis?',
-    a: 'Yes. You can upload PDF, Markdown, or plain text files alongside your prompt. The ontology engine uses your documents as primary context, resulting in more domain-specific and accurate simulations.',
+    q: 'Can I ask follow-up questions?',
+    a: "Absolutely. After your prediction report is ready, you can chat with the AI agent to dive deeper into specific findings, ask about risks, or explore alternative scenarios.",
+  },
+  {
+    q: 'Is my data private?',
+    a: "Yes. Your predictions are private to your account. We never share your scenarios or reports with other users.",
   },
 ];
 
@@ -629,7 +675,7 @@ function FAQSection() {
         <div ref={ref} className={cn('text-center mb-14 transition-all duration-700', inView ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6')}>
           <p className="font-mono text-xs text-mint uppercase tracking-[0.2em] mb-4">FAQ</p>
           <h2 className="font-display font-800 text-3xl sm:text-4xl text-bright">
-            Common questions
+            Questions people actually ask
           </h2>
         </div>
         <div className="space-y-3">
@@ -644,7 +690,7 @@ function FAQSection() {
                 className="w-full flex items-center justify-between px-6 py-5 text-left"
               >
                 <span className="font-display font-600 text-text text-sm pr-4">{q}</span>
-                <ChevronDown className={cn('w-4 h-4 text-muted shrink-0 transition-transform duration-300', open === i && 'rotate-180')} />
+                <ChevronDown className={cn('w-4 h-4 text-muted shrink-0 transition-transform duration-300', open === i && 'rotate-180 text-mint')} />
               </button>
               {open === i && (
                 <div className="px-6 pb-5">
@@ -676,22 +722,24 @@ function CTABanner() {
         <div className="relative z-10">
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-mint/20 bg-mint/5 mb-6">
             <span className="w-1.5 h-1.5 rounded-full bg-mint animate-pulse-slow" aria-hidden />
-            <span className="font-mono text-xs text-mint">Ready to predict the future?</span>
+            <span className="font-mono text-xs text-mint">Ready to see the future?</span>
           </div>
           <h2 className="font-display font-800 text-3xl sm:text-4xl text-bright mb-4">
-            Start your first simulation today
+            Your first prediction is free
           </h2>
           <p className="text-muted text-lg max-w-lg mx-auto mb-8">
-            Join 120+ analysts, strategists, and researchers already using MiroFish to stress-test their assumptions.
+            Join {' '}
+            <span className="text-mint">120+ analysts, strategists, and researchers</span>
+            {' '} already using MiroFish to stress-test their assumptions before it&apos;s too late.
           </p>
           <Link
-            href="/chat"
+            href="/auth/signin"
             className="inline-flex items-center gap-2.5 font-display font-700 text-base px-8 py-4 rounded-xl bg-mint text-bg hover:bg-mint-dim shadow-glow-mint transition-all duration-200 group"
           >
-            Start Your First Prediction
+            Try It Free
             <ArrowRight className="w-5 h-5 group-hover:translate-x-0.5 transition-transform" />
           </Link>
-          <p className="font-mono text-xs text-muted/60 mt-5">1 free prediction · No credit card</p>
+          <p className="font-mono text-xs text-muted/60 mt-5">1 free prediction · No credit card · Cancel anytime</p>
         </div>
       </div>
     </section>
@@ -704,9 +752,8 @@ function Footer() {
     <footer className="border-t border-border bg-surface/30 py-12 px-6">
       <div className="max-w-7xl mx-auto">
         <div className="flex flex-col md:flex-row items-start justify-between gap-8 mb-10">
-          {/* Brand */}
           <div className="max-w-xs">
-            <Link href="/" className="flex items-center gap-2 mb-3 select-none group">
+            <Link href="/" className="flex items-center gap-2 mb-3 select-none">
               <svg width="24" height="17" viewBox="0 0 28 20" fill="none" aria-hidden>
                 <polygon points="2,2 2,18 22,10" fill="#64FFDA" opacity="0.9" />
                 <polygon points="22,4 22,16 27,10" fill="#64FFDA" opacity="0.55" />
@@ -719,13 +766,12 @@ function Footer() {
             </p>
           </div>
 
-          {/* Links */}
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-8">
             <div>
               <p className="font-mono text-xs text-muted/50 uppercase tracking-widest mb-3">Product</p>
               <div className="space-y-2">
+                <a href="#demo" className="block font-body text-sm text-muted hover:text-text transition-colors">See a Demo</a>
                 <a href="#how-it-works" className="block font-body text-sm text-muted hover:text-text transition-colors">How It Works</a>
-                <a href="#examples" className="block font-body text-sm text-muted hover:text-text transition-colors">Examples</a>
                 <a href="#pricing" className="block font-body text-sm text-muted hover:text-text transition-colors">Pricing</a>
                 <a href="#faq" className="block font-body text-sm text-muted hover:text-text transition-colors">FAQ</a>
               </div>
@@ -734,7 +780,7 @@ function Footer() {
               <p className="font-mono text-xs text-muted/50 uppercase tracking-widest mb-3">Account</p>
               <div className="space-y-2">
                 <Link href="/auth/signin" className="block font-body text-sm text-muted hover:text-text transition-colors">Sign In</Link>
-                <Link href="/chat" className="block font-body text-sm text-muted hover:text-text transition-colors">Start Predicting</Link>
+                <Link href="/chat" className="block font-body text-sm text-muted hover:text-text transition-colors">Try It Free</Link>
               </div>
             </div>
             <div>
@@ -812,6 +858,8 @@ export default function HomePage() {
       onDrop={handleDrop}
     >
       <Header />
+
+      {/* 1. Hero */}
       <HeroSection
         prompt={prompt}
         setPrompt={setPrompt}
@@ -820,12 +868,29 @@ export default function HomePage() {
         isDragging={isDragging}
         onSubmit={handleSubmit}
       />
+
+      {/* 2. Social Proof */}
       <SocialProofBar />
+
+      {/* 3. Demo Report */}
+      <DemoSection />
+
+      {/* 4. How It Works */}
       <HowItWorksSection />
+
+      {/* 5. Example Scenarios */}
       <ExamplesSection onSelect={(p) => navigateToChat(p)} />
+
+      {/* 6. Pricing */}
       <PricingSection />
+
+      {/* 7. FAQ */}
       <FAQSection />
+
+      {/* 8. CTA Banner */}
       <CTABanner />
+
+      {/* 9. Footer */}
       <Footer />
     </div>
   );
