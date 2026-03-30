@@ -88,11 +88,13 @@ export default function AdminPage() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { router.push('/'); return; }
 
-    const { data } = await supabase.from('users').select('role').eq('id', user.id).single();
-    if (data?.role !== 'admin') { router.push('/'); return; }
+    const res = await fetch('/api/credits/balance');
+    if (!res.ok) { router.push('/'); return; }
+    const { role } = await res.json();
+    if (role !== 'admin') { router.push('/'); return; }
     setIsAdmin(true);
   }, [supabase, router]);
-
+  
   const fetchUsers = useCallback(async () => {
     const res = await fetch('/api/admin/users');
     if (res.ok) {
