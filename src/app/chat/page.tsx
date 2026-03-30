@@ -156,7 +156,7 @@ function FileChip({ file, onRemove }: { file: File; onRemove: () => void }) {
 }
 
 // ─── Backend URL ───────────────────────────────────────────────────────────────
-const API_URL = 'http://161.35.124.54:5001';
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'https://api.mirofish.us';
 
 // ─── HTTP helpers ──────────────────────────────────────────────────────────────
 
