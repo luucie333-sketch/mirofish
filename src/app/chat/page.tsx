@@ -7,6 +7,7 @@ import {
   ChevronLeft, Menu, RotateCcw, Send, Paperclip, FileText, X,
   Circle, LoaderCircle, CircleCheck, CircleX, Zap, Lock,
   History, Plus, Trash2, MessageSquare,
+  Download, Clock, Bot, ArrowRight,
 } from 'lucide-react';
 import { cn, formatTime, truncateFilename, randomId } from '@/lib/utils';
 import UserMenu from '@/components/auth/UserMenu';
@@ -23,6 +24,13 @@ interface Stage {
   detail?: string;
 }
 
+interface SimStats {
+  agents: number;
+  rounds: number;
+  actions: number;
+  durationMs: number;
+}
+
 interface Message {
   id: string;
   role: 'user' | 'assistant' | 'system';
@@ -30,6 +38,7 @@ interface Message {
   timestamp: Date;
   isStreaming?: boolean;
   isError?: boolean;
+  isReport?: boolean;
 }
 
 interface StoredMessage {
@@ -38,6 +47,7 @@ interface StoredMessage {
   content: string;
   timestamp: string;
   isError?: boolean;
+  isReport?: boolean;
 }
 
 interface ChatSession {
@@ -70,6 +80,7 @@ function serializeMessage(m: Message): StoredMessage {
     content: m.content,
     timestamp: m.timestamp instanceof Date ? m.timestamp.toISOString() : String(m.timestamp),
     isError: m.isError,
+    isReport: m.isReport,
   };
 }
 
@@ -85,6 +96,7 @@ function parseMessages(stored: StoredMessage[]): Message[] {
     timestamp: new Date(m.timestamp),
     isError: m.isError ?? false,
     isStreaming: false,
+    isReport: m.isReport ?? false,
   }));
 }
 
@@ -367,6 +379,196 @@ function MarkdownRenderer({ content }: { content: string }) {
   return <div className="space-y-0.5">{elements}</div>;
 }
 
+// ─── Report card components ────────────────────────────────────────────────────
+
+function ReportMarkdownRenderer({ content }: { content: string }) {
+  const lines = content.split('\n');
+  const elements: React.ReactNode[] = [];
+  let listItems: string[] = [];
+
+  function flushList(key: string) {
+    if (listItems.length === 0) return;
+    elements.push(
+      <ul key={key} className="my-3 space-y-1.5 pl-1">
+        {listItems.map((item, i) => (
+          <li key={i} className="flex gap-3 text-sm leading-relaxed text-text">
+            <span className="mt-2 w-1.5 h-1.5 rounded-full bg-mint/70 shrink-0" />
+            <span>{renderInline(item)}</span>
+          </li>
+        ))}
+      </ul>
+    );
+    listItems = [];
+  }
+
+  function renderInline(text: string): React.ReactNode {
+    const parts = text.split(/(\*\*[^*]+\*\*)/g);
+    return parts.map((part, i) => {
+      if (part.startsWith('**') && part.endsWith('**')) {
+        return <strong key={i} className="font-semibold text-bright">{part.slice(2, -2)}</strong>;
+      }
+      return part;
+    });
+  }
+
+  lines.forEach((line, idx) => {
+    const trimmed = line.trim();
+
+    if (/^##\s/.test(trimmed)) {
+      flushList(`list-${idx}`);
+      elements.push(
+        <div key={idx} className="flex items-center gap-3 mt-6 mb-3 first:mt-0">
+          <div className="w-1 h-5 rounded-full bg-mint/60 shrink-0" />
+          <h2 className="font-display font-700 text-base text-mint leading-tight">
+            {trimmed.replace(/^##\s+/, '')}
+          </h2>
+        </div>
+      );
+      return;
+    }
+
+    if (/^###\s/.test(trimmed)) {
+      flushList(`list-${idx}`);
+      elements.push(
+        <h3 key={idx} className="font-display font-600 text-sm text-mint/80 mt-4 mb-1.5 first:mt-0">
+          {trimmed.replace(/^###\s+/, '')}
+        </h3>
+      );
+      return;
+    }
+
+    if (/^>\s/.test(trimmed)) {
+      flushList(`list-${idx}`);
+      elements.push(
+        <blockquote key={idx} className="border-l-2 border-mint/40 pl-4 my-3 italic text-sm text-muted leading-relaxed bg-mint/3 py-2 rounded-r-lg">
+          {renderInline(trimmed.replace(/^>\s+/, ''))}
+        </blockquote>
+      );
+      return;
+    }
+
+    if (/^[-*]\s/.test(trimmed)) {
+      listItems.push(trimmed.replace(/^[-*]\s+/, ''));
+      return;
+    }
+
+    if (trimmed === '') {
+      flushList(`list-${idx}`);
+      elements.push(<div key={idx} className="h-1" />);
+      return;
+    }
+
+    flushList(`list-${idx}`);
+    elements.push(
+      <p key={idx} className="text-sm text-text leading-relaxed">
+        {renderInline(trimmed)}
+      </p>
+    );
+  });
+
+  flushList('list-end');
+  return <div className="space-y-1">{elements}</div>;
+}
+
+function generateSuggestions(sectionTitles: string[]): string[] {
+  const dynamic = sectionTitles
+    .filter((t) => t.length < 50)
+    .slice(0, 2)
+    .map((t) => `Tell me more about ${t}`);
+  const fallbacks = [
+    'What are the main risks I should be aware of?',
+    'How confident are you in this prediction?',
+    'What alternative scenarios should I consider?',
+    'What actions should I take based on this?',
+  ];
+  return [...dynamic, ...fallbacks].slice(0, 3);
+}
+
+function StatsBar({ stats }: { stats: SimStats }) {
+  const mins = Math.max(1, Math.round(stats.durationMs / 60000));
+  const items = [
+    { icon: <Bot className="w-3.5 h-3.5" />, label: `${stats.agents || '–'} Agents`, color: 'text-periwinkle border-periwinkle/20 bg-periwinkle/8' },
+    { icon: <RotateCcw className="w-3.5 h-3.5" />, label: `${stats.rounds || '–'} Rounds`, color: 'text-mint border-mint/20 bg-mint/8' },
+    { icon: <Zap className="w-3.5 h-3.5" />, label: `${stats.actions || '–'} Actions`, color: 'text-amber border-amber/20 bg-amber/8' },
+    { icon: <Clock className="w-3.5 h-3.5" />, label: `${mins} min`, color: 'text-coral border-coral/20 bg-coral/8' },
+  ];
+  return (
+    <div className="flex flex-wrap gap-2 mb-3">
+      {items.map(({ icon, label, color }) => (
+        <div key={label} className={cn('inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border font-mono text-xs', color)}>
+          {icon}{label}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ReportCard({
+  content, stats, timestamp, onSuggest,
+}: { content: string; stats: SimStats | null; timestamp: Date; onSuggest: (q: string) => void }) {
+  const titleMatch = content.match(/^#\s+(.+)/m);
+  const title = titleMatch ? titleMatch[1].trim() : 'Prediction Report';
+  const body = content.replace(/^#\s+.+\n?/m, '').trim();
+  const sections = [...content.matchAll(/^##\s+(.+)/gm)].map((m) => m[1].trim());
+  const suggestions = generateSuggestions(sections);
+
+  return (
+    <div className="message-in w-full">
+      {stats && <StatsBar stats={stats} />}
+
+      <div id="mirofish-report" className="rounded-2xl border border-mint/20 bg-gradient-to-b from-[#0a1a15] to-card overflow-hidden shadow-[0_4px_40px_rgba(0,0,0,0.7)] relative">
+        {/* Top accent line */}
+        <div className="h-px bg-gradient-to-r from-transparent via-mint/50 to-transparent" aria-hidden />
+
+        {/* Header */}
+        <div className="flex items-start justify-between px-6 py-5 border-b border-border/60">
+          <div className="flex-1 min-w-0 pr-4">
+            <span className="inline-flex items-center font-mono text-[10px] text-mint/80 uppercase tracking-widest px-2.5 py-1 rounded-full border border-mint/20 bg-mint/5 mb-3">
+              Prediction Report
+            </span>
+            <h1 className="font-display font-800 text-bright text-xl leading-snug">{title}</h1>
+          </div>
+          <button
+            onClick={() => window.print()}
+            className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-border text-muted hover:text-text hover:border-mint/30 font-mono text-xs transition-all"
+            title="Download as PDF"
+          >
+            <Download className="w-3.5 h-3.5" />
+            PDF
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="px-6 py-6">
+          <ReportMarkdownRenderer content={body} />
+        </div>
+
+        {/* Bottom accent */}
+        <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent" aria-hidden />
+        <div className="px-6 py-3 flex items-center justify-between">
+          <time className="font-mono text-xs text-muted/40">{formatTime(timestamp)}</time>
+          <span className="font-mono text-[10px] text-muted/30 uppercase tracking-widest">MiroFish · AI Simulation</span>
+        </div>
+      </div>
+
+      {/* Follow-up suggestion chips */}
+      <div className="mt-3 flex flex-wrap gap-2">
+        {suggestions.map((s) => (
+          <button
+            key={s}
+            type="button"
+            onClick={() => onSuggest(s)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-border bg-surface text-muted hover:border-mint/30 hover:text-mint hover:bg-mint/5 font-mono text-xs transition-all"
+          >
+            <ArrowRight className="w-3 h-3 shrink-0" />
+            {s}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function AssistantMessage({
   content, timestamp, isStreaming, isError,
 }: { content: string; timestamp: Date; isStreaming?: boolean; isError?: boolean }) {
@@ -412,9 +614,22 @@ function SystemMessage({ content, timestamp }: { content: string; timestamp: Dat
   );
 }
 
-function MessageItem({ role, content, timestamp, isStreaming, isError }: Message) {
+function MessageItem({
+  role, content, timestamp, isStreaming, isError, isReport,
+  simStats, onSuggest,
+}: Message & { simStats?: SimStats | null; onSuggest?: (q: string) => void }) {
   if (role === 'user') return <UserMessage content={content} timestamp={timestamp} />;
   if (role === 'system') return <SystemMessage content={content} timestamp={timestamp} />;
+  if (isReport) {
+    return (
+      <ReportCard
+        content={content}
+        stats={simStats ?? null}
+        timestamp={timestamp}
+        onSuggest={onSuggest ?? (() => {})}
+      />
+    );
+  }
   return <AssistantMessage content={content} timestamp={timestamp} isStreaming={isStreaming} isError={isError} />;
 }
 
@@ -546,6 +761,7 @@ function ChatWorkspace() {
   const [simulationId, setSimulationId] = useState<string | null>(null);
   const [pipelineComplete, setPipelineComplete] = useState(false);
   const [chatHistory, setChatHistory] = useState<{ role: string; content: string }[]>([]);
+  const [simStats, setSimStats] = useState<SimStats | null>(null);
 
   // Session history state
   const [sessions, setSessions] = useState<ChatSession[]>([]);
@@ -555,6 +771,7 @@ function ChatWorkspace() {
   // Refs
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const simStartRef = useRef<number>(0);
   const fileRef = useRef<HTMLInputElement>(null);
   const messagesRef = useRef<Message[]>([]); // always-current messages for async saves
   const sessionIdRef = useRef<string | null>(null); // always-current session ID for async saves
@@ -680,6 +897,7 @@ function ChatWorkspace() {
         setSimulationId(null);
         setPipelineComplete(false);
         setChatHistory([]);
+        setSimStats(null);
       }
     } catch {
       // Non-fatal
@@ -710,13 +928,15 @@ function ChatWorkspace() {
     setSimulationId(null);
     setPipelineComplete(false);
     setChatHistory([]);
+    setSimStats(null);
   }, []);
 
   // ── Send message ──────────────────────────────────────────────────────────────
 
-  const sendMessage = useCallback(async () => {
-    const text = input.trim();
+  const sendMessage = useCallback(async (overrideText?: string) => {
+    const text = (overrideText ?? input).trim();
     if (isLoading || !text) return;
+    if (!overrideText) setInput('');
 
     // 1. Client-side credit guard
     if (credits === null) {
@@ -752,7 +972,7 @@ function ChatWorkspace() {
     };
 
     setMessages((prev) => [...prev, userMsg, assistantMsg]);
-    setInput('');
+    if (overrideText) setInput(''); // clear if suggestion filled it
     setIsLoading(true);
 
     if (!pipelineComplete) {
@@ -849,13 +1069,23 @@ function ChatWorkspace() {
           }
           updateStage('simulation', 'running', 'Running simulation…');
         }
-        await pollSimulationStatus(newSimId, 5000, 1800000, (progress) => {
+        simStartRef.current = Date.now();
+        const simResult = await pollSimulationStatus(newSimId, 5000, 1800000, (progress) => {
           updateStage(
             'simulation',
             'running',
             `Round ${progress.current_round}/${progress.total_rounds} — ${progress.progress_percent}%`,
           );
         });
+        const simDurationMs = Date.now() - simStartRef.current;
+        const sd = simResult?.data ?? {};
+        const capturedStats: SimStats = {
+          agents: sd.agent_count ?? sd.num_agents ?? sd.total_agents ?? 0,
+          rounds: sd.current_round ?? sd.total_rounds ?? 0,
+          actions: sd.total_actions ?? sd.action_count ?? sd.num_actions ?? 0,
+          durationMs: simDurationMs,
+        };
+        setSimStats(capturedStats);
         updateStage('simulation', 'done', 'Simulation complete');
 
         // Step 6: Generate Report
@@ -899,14 +1129,14 @@ function ChatWorkspace() {
           { role: 'assistant', content: reportContent },
         ]);
         setMessages((prev) =>
-          prev.map((m) => m.id === assistantId ? { ...m, content: reportContent, isStreaming: false } : m)
+          prev.map((m) => m.id === assistantId ? { ...m, content: reportContent, isStreaming: false, isReport: true } : m)
         );
 
         // Save completed session
         if (sessionIdRef.current) {
           const messagesToSave = serializeMessages([
             userMsg,
-            { id: assistantId, role: 'assistant', content: reportContent, timestamp: new Date() },
+            { id: assistantId, role: 'assistant', content: reportContent, timestamp: new Date(), isReport: true },
           ]);
           await patchSession(sessionIdRef.current, {
             pipeline_complete: true,
@@ -988,6 +1218,10 @@ function ChatWorkspace() {
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+  }, [sendMessage]);
+
+  const handleSuggest = useCallback((q: string) => {
+    void sendMessage(q);
   }, [sendMessage]);
 
   const pipelineStatus = (() => {
@@ -1148,7 +1382,14 @@ function ChatWorkspace() {
               <p className="text-muted font-mono text-sm">Enter a prediction prompt to begin</p>
             </div>
           ) : (
-            messages.map((m) => <MessageItem key={m.id} {...m} />)
+            messages.map((m) => (
+              <MessageItem
+                key={m.id}
+                {...m}
+                simStats={m.isReport ? simStats : null}
+                onSuggest={m.isReport ? handleSuggest : undefined}
+              />
+            ))
           )}
           <div ref={bottomRef} />
         </div>

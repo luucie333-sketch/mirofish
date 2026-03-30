@@ -108,3 +108,69 @@ body {
 .focus-ring:focus-visible {
   box-shadow: 0 0 0 2px #07070f, 0 0 0 4px rgba(100, 255, 218, 0.5);
 }
+
+/* ─── Print / PDF styles ─────────────────────────────────────────────────────── */
+@media print {
+  /* Hide entire page chrome — show only the report */
+  body * {
+    visibility: hidden !important;
+  }
+  #mirofish-report,
+  #mirofish-report * {
+    visibility: visible !important;
+  }
+  #mirofish-report {
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    padding: 48px 56px !important;
+    background: #ffffff !important;
+    color: #111111 !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    font-family: 'Plus Jakarta Sans', system-ui, sans-serif !important;
+  }
+  /* Branding header injected via ::before */
+  #mirofish-report::before {
+    content: 'MiroFish · Prediction Report';
+    display: block;
+    font-family: 'Syne', system-ui, sans-serif;
+    font-weight: 700;
+    font-size: 11px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: #10b981;
+    padding-bottom: 16px;
+    margin-bottom: 24px;
+    border-bottom: 2px solid #10b981;
+    visibility: visible !important;
+  }
+  /* Typography overrides */
+  #mirofish-report h1,
+  #mirofish-report h2,
+  #mirofish-report h3 {
+    color: #111111 !important;
+  }
+  #mirofish-report p,
+  #mirofish-report li,
+  #mirofish-report blockquote {
+    color: #333333 !important;
+  }
+  #mirofish-report blockquote {
+    border-left: 3px solid #10b981 !important;
+    padding-left: 12px !important;
+    color: #555555 !important;
+  }
+  /* Hide header bar, footer, and buttons inside the card */
+  #mirofish-report > div:first-child,
+  #mirofish-report > div:last-child,
+  #mirofish-report button {
+    display: none !important;
+  }
+  @page {
+    margin: 0;
+    size: A4;
+  }
+}
