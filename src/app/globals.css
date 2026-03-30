@@ -1,0 +1,110 @@
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&family=Source+Code+Pro:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-syne: 'Syne', system-ui, sans-serif;
+  --font-jakarta: 'Plus Jakarta Sans', system-ui, sans-serif;
+  --font-mono: 'Source Code Pro', Menlo, monospace;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: #07070f;
+  color: #e2e2f0;
+  font-family: var(--font-jakarta);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #0e0e1a;
+}
+::-webkit-scrollbar-thumb {
+  background: #2a2a48;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #64ffda44;
+}
+
+::selection {
+  background: rgba(100, 255, 218, 0.2);
+  color: #64ffda;
+}
+
+.bg-grid {
+  background-image:
+    linear-gradient(rgba(30, 30, 53, 0.5) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(30, 30, 53, 0.5) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+
+.glow-mint {
+  text-shadow: 0 0 20px rgba(100, 255, 218, 0.5);
+}
+
+.glow-coral {
+  text-shadow: 0 0 20px rgba(255, 107, 107, 0.5);
+}
+
+.bg-dots {
+  background-image: radial-gradient(rgba(100, 255, 218, 0.08) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+@keyframes messageIn {
+  0% { opacity: 0; transform: translateY(8px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+.message-in {
+  animation: messageIn 0.3s ease-out;
+}
+
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.card-shimmer::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(100, 255, 218, 0.03) 50%, transparent);
+  transform: translateX(-100%);
+}
+
+.card-shimmer:hover::before {
+  animation: shimmer 0.6s ease-out;
+}
+
+.focus-ring:focus {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+}
+
+.focus-ring:focus-visible {
+  box-shadow: 0 0 0 2px #07070f, 0 0 0 4px rgba(100, 255, 218, 0.5);
+}
