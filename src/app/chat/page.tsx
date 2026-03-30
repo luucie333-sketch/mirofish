@@ -6,10 +6,13 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import {
   ChevronLeft, Menu, RotateCcw, Send, Paperclip, FileText, X,
   Circle, LoaderCircle, CircleCheck, CircleX, Zap, Lock,
+  History, Plus, Trash2, MessageSquare,
 } from 'lucide-react';
 import { cn, formatTime, truncateFilename, randomId } from '@/lib/utils';
 import UserMenu from '@/components/auth/UserMenu';
 import { useCredits } from '@/components/providers/CreditsProvider';
+
+// ─── Types ─────────────────────────────────────────────────────────────────────
 
 type StageStatus = 'pending' | 'running' | 'done' | 'error';
 
@@ -29,12 +32,90 @@ interface Message {
   isError?: boolean;
 }
 
+interface StoredMessage {
+  id: string;
+  role: string;
+  content: string;
+  timestamp: string;
+  isError?: boolean;
+}
+
+interface ChatSession {
+  id: string;
+  title: string;
+  simulation_id: string | null;
+  project_id: string | null;
+  pipeline_complete: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+// ─── Constants ─────────────────────────────────────────────────────────────────
+
 const INITIAL_STAGES: Stage[] = [
   { id: 'seed', label: 'Seed Analysis', status: 'pending' },
   { id: 'graph', label: 'Graph Building', status: 'pending' },
   { id: 'simulation', label: 'Multi-Agent Simulation', status: 'pending' },
   { id: 'report', label: 'Structured Report', status: 'pending' },
 ];
+
+const STAGES_ALL_DONE: Stage[] = INITIAL_STAGES.map((s) => ({ ...s, status: 'done' as StageStatus }));
+
+// ─── Serialization helpers ─────────────────────────────────────────────────────
+
+function serializeMessage(m: Message): StoredMessage {
+  return {
+    id: m.id,
+    role: m.role,
+    content: m.content,
+    timestamp: m.timestamp instanceof Date ? m.timestamp.toISOString() : String(m.timestamp),
+    isError: m.isError,
+  };
+}
+
+function serializeMessages(msgs: Message[]): StoredMessage[] {
+  return msgs.filter((m) => !m.isStreaming).map(serializeMessage);
+}
+
+function parseMessages(stored: StoredMessage[]): Message[] {
+  return stored.map((m) => ({
+    id: m.id,
+    role: m.role as Message['role'],
+    content: m.content,
+    timestamp: new Date(m.timestamp),
+    isError: m.isError ?? false,
+    isStreaming: false,
+  }));
+}
+
+// ─── Session API helpers (module-level, no React state) ────────────────────────
+
+async function patchSession(id: string, data: object): Promise<void> {
+  try {
+    await fetch(`/api/chat-sessions/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+  } catch {
+    // Non-fatal — session save failure never breaks the pipeline
+  }
+}
+
+// ─── Date formatting ───────────────────────────────────────────────────────────
+
+function formatRelativeDate(dateStr: string): string {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  if (diffDays === 0) return 'Today';
+  if (diffDays === 1) return 'Yesterday';
+  if (diffDays < 7) return `${diffDays}d ago`;
+  return date.toLocaleDateString();
+}
+
+// ─── Pipeline sidebar components ───────────────────────────────────────────────
 
 function StageIcon({ status }: { status: StageStatus }) {
   switch (status) {
@@ -78,6 +159,104 @@ function PipelineProgress({ stages }: { stages: Stage[] }) {
     </div>
   );
 }
+
+// ─── History sidebar components ────────────────────────────────────────────────
+
+interface SessionItemProps {
+  session: ChatSession;
+  isActive: boolean;
+  onLoad: () => void;
+  onDelete: (e: React.MouseEvent) => void;
+}
+
+function SessionItem({ session, isActive, onLoad, onDelete }: SessionItemProps) {
+  return (
+    <div
+      onClick={onLoad}
+      className={cn(
+        'group flex items-center gap-2 px-2.5 py-2 rounded-lg cursor-pointer transition-all mb-0.5',
+        isActive
+          ? 'bg-mint/10 border border-mint/20'
+          : 'hover:bg-card border border-transparent hover:border-border/50'
+      )}
+    >
+      <div className="flex-1 min-w-0">
+        <p className={cn('font-mono text-xs truncate leading-snug', isActive ? 'text-text' : 'text-muted group-hover:text-text')}>
+          {session.title}
+        </p>
+        <p className="font-mono text-[10px] text-muted/50 mt-0.5">
+          {formatRelativeDate(session.updated_at)}
+        </p>
+      </div>
+      <button
+        onClick={onDelete}
+        className="opacity-0 group-hover:opacity-100 p-1 rounded text-muted hover:text-coral hover:bg-coral/10 transition-all shrink-0"
+        aria-label="Delete session"
+        type="button"
+      >
+        <Trash2 className="w-3 h-3" />
+      </button>
+    </div>
+  );
+}
+
+interface HistorySidebarProps {
+  sessions: ChatSession[];
+  activeSessionId: string | null;
+  loading: boolean;
+  onNewChat: () => void;
+  onLoadSession: (session: ChatSession) => void;
+  onDeleteSession: (id: string) => void;
+}
+
+function HistorySidebar({
+  sessions, activeSessionId, loading, onNewChat, onLoadSession, onDeleteSession,
+}: HistorySidebarProps) {
+  return (
+    <div className="flex flex-col h-full">
+      <div className="px-3 pt-4 pb-3 border-b border-border shrink-0">
+        <p className="font-display font-semibold text-xs text-muted uppercase tracking-widest mb-3 px-1">
+          History
+        </p>
+        <button
+          onClick={onNewChat}
+          type="button"
+          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-dashed border-border/60 text-muted hover:text-text hover:border-mint/40 hover:bg-mint/5 transition-all font-mono text-xs"
+        >
+          <Plus className="w-3.5 h-3.5 shrink-0" />
+          New Chat
+        </button>
+      </div>
+
+      <div className="flex-1 overflow-y-auto py-2 px-2">
+        {loading ? (
+          <div className="flex justify-center py-8">
+            <div className="w-4 h-4 rounded-full border-2 border-mint border-t-transparent animate-spin" />
+          </div>
+        ) : sessions.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-10 gap-2">
+            <MessageSquare className="w-6 h-6 text-muted/30" />
+            <p className="font-mono text-[10px] text-muted/40 text-center leading-relaxed">
+              No past chats yet.<br />Send a message to begin.
+            </p>
+          </div>
+        ) : (
+          sessions.map((session) => (
+            <SessionItem
+              key={session.id}
+              session={session}
+              isActive={session.id === activeSessionId}
+              onLoad={() => onLoadSession(session)}
+              onDelete={(e) => { e.stopPropagation(); onDeleteSession(session.id); }}
+            />
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Message components ────────────────────────────────────────────────────────
 
 function Cursor() {
   return <span className="inline-block w-0.5 h-3.5 bg-mint ml-0.5 align-middle animate-pulse" />;
@@ -176,7 +355,6 @@ async function postFormData(url: string, data: { simulation_requirement: string;
   if (data.files.length > 0) {
     data.files.forEach((f) => fd.append('files', f));
   } else {
-    // Backend requires at least one file — synthesize one from the prompt text
     const blob = new Blob([data.simulation_requirement], { type: 'text/plain' });
     fd.append('files', blob, 'prompt.txt');
   }
@@ -254,13 +432,16 @@ async function pollReportStatus(taskId: string, simId: string, interval: number,
 function ChatWorkspace() {
   const searchParams = useSearchParams();
   const router = useRouter();
+
+  // UI state
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [stages, setStages] = useState<Stage[]>(INITIAL_STAGES);
   const [activeStage, setActiveStage] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [pipelineOpen, setPipelineOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [outOfCredits, setOutOfCredits] = useState(false);
   const [toastMsg, setToastMsg] = useState('');
 
@@ -270,18 +451,34 @@ function ChatWorkspace() {
   const [pipelineComplete, setPipelineComplete] = useState(false);
   const [chatHistory, setChatHistory] = useState<{ role: string; content: string }[]>([]);
 
+  // Session history state
+  const [sessions, setSessions] = useState<ChatSession[]>([]);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
+
+  // Refs
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const messagesRef = useRef<Message[]>([]); // always-current messages for async saves
+  const sessionIdRef = useRef<string | null>(null); // always-current session ID for async saves
+
   const { credits, isSubscribed, subscriptionExpires, refresh: refreshCredits, setShowBuyModal } = useCredits();
 
+  // Keep refs in sync with state
+  useEffect(() => { messagesRef.current = messages; }, [messages]);
+  useEffect(() => { sessionIdRef.current = activeSessionId; }, [activeSessionId]);
+
+  // Initialise sidebar visibility based on screen width
+  useEffect(() => {
+    setPipelineOpen(window.innerWidth >= 768);
+    setHistoryOpen(window.innerWidth >= 1024);
+  }, []);
+
   useEffect(() => { document.title = 'Chat Workspace | MiroFish'; }, []);
-  useEffect(() => { setSidebarOpen(window.innerWidth > 768); }, []);
 
   useEffect(() => {
-    if (credits === 0 && !isSubscribed) {
-      setShowBuyModal(true);
-    }
+    if (credits === 0 && !isSubscribed) setShowBuyModal(true);
   }, [credits, isSubscribed, setShowBuyModal]);
 
   useEffect(() => {
@@ -301,12 +498,111 @@ function ChatWorkspace() {
     setTimeout(() => setToastMsg(''), 4000);
   }
 
+  // ── Session management ────────────────────────────────────────────────────────
+
+  const loadSessions = useCallback(async () => {
+    setSessionsLoading(true);
+    try {
+      const res = await fetch('/api/chat-sessions');
+      if (res.ok) {
+        const { sessions: data } = await res.json();
+        setSessions(data ?? []);
+      }
+    } finally {
+      setSessionsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadSessions(); }, [loadSessions]);
+
+  const createSession = useCallback(async (title: string, firstMsg: Message): Promise<string | null> => {
+    try {
+      const res = await fetch('/api/chat-sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, messages: [serializeMessage(firstMsg)] }),
+      });
+      if (!res.ok) return null;
+      const { session } = await res.json();
+      sessionIdRef.current = session.id;
+      setActiveSessionId(session.id);
+      setSessions((prev) => [session, ...prev.filter((s) => s.id !== session.id)]);
+      return session.id;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const loadSession = useCallback(async (session: ChatSession) => {
+    try {
+      const res = await fetch(`/api/chat-sessions/${session.id}`);
+      if (!res.ok) return;
+      const { session: full } = await res.json();
+
+      const parsed = parseMessages(full.messages ?? []);
+      messagesRef.current = parsed;
+      setMessages(parsed);
+      setSimulationId(full.simulation_id ?? null);
+      setProjectId(full.project_id ?? null);
+      setPipelineComplete(full.pipeline_complete ?? false);
+      sessionIdRef.current = full.id;
+      setActiveSessionId(full.id);
+
+      // Reconstruct chat history for the report agent
+      const history = parsed
+        .filter((m) => (m.role === 'user' || m.role === 'assistant') && !m.isError)
+        .map((m) => ({ role: m.role as string, content: m.content }));
+      setChatHistory(history);
+
+      setStages(full.pipeline_complete ? STAGES_ALL_DONE : INITIAL_STAGES);
+      setActiveStage(null);
+      setInput('');
+      setFile(null);
+      setOutOfCredits(false);
+      setIsLoading(false);
+    } catch {
+      // Non-fatal
+    }
+  }, []);
+
+  const deleteSession = useCallback(async (id: string) => {
+    try {
+      await fetch(`/api/chat-sessions/${id}`, { method: 'DELETE' });
+      setSessions((prev) => prev.filter((s) => s.id !== id));
+      if (sessionIdRef.current === id) {
+        sessionIdRef.current = null;
+        setActiveSessionId(null);
+        messagesRef.current = [];
+        setMessages([]);
+        setInput('');
+        setIsLoading(false);
+        setStages(INITIAL_STAGES);
+        setActiveStage(null);
+        setFile(null);
+        setOutOfCredits(false);
+        setProjectId(null);
+        setSimulationId(null);
+        setPipelineComplete(false);
+        setChatHistory([]);
+      }
+    } catch {
+      // Non-fatal
+    }
+  }, []);
+
+  // ── Stage helpers ─────────────────────────────────────────────────────────────
+
   const updateStage = useCallback((id: string, status: StageStatus, detail?: string) => {
     setStages((prev) => prev.map((s) => s.id === id ? { ...s, status, detail } : s));
     setActiveStage(status === 'running' ? id : null);
   }, []);
 
+  // ── Reset ─────────────────────────────────────────────────────────────────────
+
   const resetChat = useCallback(() => {
+    sessionIdRef.current = null;
+    messagesRef.current = [];
+    setActiveSessionId(null);
     setMessages([]);
     setInput('');
     setIsLoading(false);
@@ -320,11 +616,13 @@ function ChatWorkspace() {
     setChatHistory([]);
   }, []);
 
+  // ── Send message ──────────────────────────────────────────────────────────────
+
   const sendMessage = useCallback(async () => {
     const text = input.trim();
     if (isLoading || !text) return;
 
-    // 1. Client-side credit guard — instant, no round trip
+    // 1. Client-side credit guard
     if (credits === null) {
       const authCheck = await fetch('/api/credits/balance');
       if (authCheck.status === 401) { router.push('/auth/signin'); return; }
@@ -336,7 +634,7 @@ function ChatWorkspace() {
       return;
     }
 
-    // 2. Server-side deduction (also validates auth + balance atomically)
+    // 2. Server-side deduction
     const creditRes = await fetch('/api/credits/use', { method: 'POST' });
     if (creditRes.status === 402) {
       setOutOfCredits(true);
@@ -344,12 +642,7 @@ function ChatWorkspace() {
       showToast("You're out of credits. Top up to continue.");
       return;
     }
-    if (creditRes.status === 401) {
-      router.push('/auth/signin');
-      return;
-    }
-
-    // Credit deducted — update balance display
+    if (creditRes.status === 401) { router.push('/auth/signin'); return; }
     refreshCredits();
 
     const userMsg: Message = { id: randomId(), role: 'user', content: text, timestamp: new Date() };
@@ -367,11 +660,16 @@ function ChatWorkspace() {
     setIsLoading(true);
 
     if (!pipelineComplete) {
-      // ── FIRST MESSAGE — run full pipeline ────────────────────────────────────
+      // ── FIRST MESSAGE — run full pipeline ───────────────────────────────────
       setStages(INITIAL_STAGES);
       setActiveStage(null);
 
+      // Create session immediately so the user sees it appear in the sidebar
+      void createSession(text.slice(0, 50), userMsg);
+
       let failedStageName = 'pipeline';
+      let newProjectId = '';
+      let newSimId = '';
 
       try {
         // Step 0: Context Enrichment
@@ -389,7 +687,7 @@ function ChatWorkspace() {
             if (enriched) enrichedText = enriched;
           }
         } catch {
-          // Enrichment failure is non-fatal — continue with original prompt
+          // Non-fatal — continue with original prompt
         }
 
         // Step 1: Ontology / Seed Analysis
@@ -399,10 +697,11 @@ function ChatWorkspace() {
           files: file ? [file] : [],
         });
         if (!ontologyRes.success) throw new Error(ontologyRes.message ?? 'Ontology generation failed');
-        const newProjectId: string = ontologyRes.data.project_id;
+        newProjectId = ontologyRes.data.project_id;
         setProjectId(newProjectId);
         const charCount: number = ontologyRes.data.total_text_length ?? 0;
         updateStage('seed', 'done', `Project ${newProjectId} created · ${charCount} chars`);
+        if (sessionIdRef.current) void patchSession(sessionIdRef.current, { project_id: newProjectId });
 
         // Step 2: Graph Building
         failedStageName = 'Graph Building';
@@ -422,17 +721,38 @@ function ChatWorkspace() {
           enable_reddit: true,
         });
         if (!simCreateRes.success) throw new Error(simCreateRes.message ?? 'Simulation creation failed');
-        const newSimId: string = simCreateRes.data.simulation_id;
+        newSimId = simCreateRes.data.simulation_id;
         setSimulationId(newSimId);
+        if (sessionIdRef.current) void patchSession(sessionIdRef.current, { simulation_id: newSimId });
 
         // Step 4: Prepare Simulation
         updateStage('simulation', 'running', 'Preparing agents…');
         await postJson(`${API_URL}/api/simulation/prepare`, { simulation_id: newSimId });
         await pollPrepareStatus(newSimId, 5000, 300000);
 
-        // Step 5: Start Simulation
+        // Step 5: Start Simulation (with 429 retry)
         updateStage('simulation', 'running', 'Running simulation…');
-        await postJson(`${API_URL}/api/simulation/start`, { simulation_id: newSimId, platform: 'parallel' });
+        {
+          const MAX_START_ATTEMPTS = 20;
+          let startAttempt = 0;
+          while (true) {
+            const startRes = await fetch(`${API_URL}/api/simulation/start`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ simulation_id: newSimId, platform: 'parallel' }),
+            });
+            if (startRes.ok) break;
+            if (startRes.status === 429 && startAttempt < MAX_START_ATTEMPTS) {
+              startAttempt++;
+              updateStage('simulation', 'running', `Waiting for slot… (attempt ${startAttempt}/${MAX_START_ATTEMPTS})`);
+              await new Promise((r) => setTimeout(r, 15000));
+            } else {
+              const errBody = await startRes.json().catch(() => ({}));
+              throw new Error(errBody?.message ?? errBody?.error ?? `Simulation start failed (${startRes.status})`);
+            }
+          }
+          updateStage('simulation', 'running', 'Running simulation…');
+        }
         await pollSimulationStatus(newSimId, 5000, 1800000, (progress) => {
           updateStage(
             'simulation',
@@ -464,10 +784,24 @@ function ChatWorkspace() {
           { role: 'user', content: text },
           { role: 'assistant', content: reportContent },
         ]);
-
         setMessages((prev) =>
           prev.map((m) => m.id === assistantId ? { ...m, content: reportContent, isStreaming: false } : m)
         );
+
+        // Save completed session
+        if (sessionIdRef.current) {
+          const messagesToSave = serializeMessages([
+            userMsg,
+            { id: assistantId, role: 'assistant', content: reportContent, timestamp: new Date() },
+          ]);
+          await patchSession(sessionIdRef.current, {
+            pipeline_complete: true,
+            project_id: newProjectId,
+            simulation_id: newSimId,
+            messages: messagesToSave,
+          });
+          loadSessions();
+        }
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : String(err);
         setStages((prev) =>
@@ -491,7 +825,7 @@ function ChatWorkspace() {
         setFile(null);
       }
     } else {
-      // ── FOLLOW-UP MESSAGE — chat with report agent ───────────────────────────
+      // ── FOLLOW-UP MESSAGE — chat with report agent ──────────────────────────
       try {
         const res = await postJson(`${API_URL}/api/report/chat`, {
           simulation_id: simulationId,
@@ -510,10 +844,19 @@ function ChatWorkspace() {
           { role: 'user', content: text },
           { role: 'assistant', content: reply },
         ]);
-
         setMessages((prev) =>
           prev.map((m) => m.id === assistantId ? { ...m, content: reply, isStreaming: false } : m)
         );
+
+        // Save updated messages to session
+        if (sessionIdRef.current) {
+          const messagesToSave = serializeMessages([
+            ...messagesRef.current.filter((m) => m.id !== assistantId),
+            { id: assistantId, role: 'assistant', content: reply, timestamp: new Date() },
+          ]);
+          await patchSession(sessionIdRef.current, { messages: messagesToSave });
+          loadSessions();
+        }
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : String(err);
         setMessages((prev) =>
@@ -527,7 +870,7 @@ function ChatWorkspace() {
         setIsLoading(false);
       }
     }
-  }, [input, isLoading, credits, isSubscribed, file, pipelineComplete, simulationId, chatHistory, updateStage, router, refreshCredits, setShowBuyModal]);
+  }, [input, isLoading, credits, isSubscribed, file, pipelineComplete, simulationId, chatHistory, updateStage, createSession, loadSessions, router, refreshCredits, setShowBuyModal]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
@@ -543,10 +886,27 @@ function ChatWorkspace() {
 
   return (
     <div className="flex h-screen bg-bg text-text overflow-hidden font-body">
-      {/* Sidebar */}
+
+      {/* ── History sidebar ── */}
+      <aside className={cn(
+        'flex-col border-r border-border bg-surface shrink-0 w-64 transition-all duration-200',
+        historyOpen ? 'flex' : 'hidden',
+        'lg:flex'
+      )}>
+        <HistorySidebar
+          sessions={sessions}
+          activeSessionId={activeSessionId}
+          loading={sessionsLoading}
+          onNewChat={resetChat}
+          onLoadSession={loadSession}
+          onDeleteSession={deleteSession}
+        />
+      </aside>
+
+      {/* ── Pipeline sidebar ── */}
       <aside className={cn(
         'flex-col border-r border-border bg-surface shrink-0 w-72 transition-all duration-200',
-        sidebarOpen ? 'flex' : 'hidden',
+        pipelineOpen ? 'flex' : 'hidden',
         'md:flex'
       )}>
         <div className="px-4 pt-4 pb-2">
@@ -567,25 +927,35 @@ function ChatWorkspace() {
         </div>
       </aside>
 
-      {/* Main */}
+      {/* ── Main ── */}
       <div className="flex-1 flex flex-col overflow-hidden">
+
         {/* Chat header */}
-        <header className="h-14 border-b border-border flex items-center px-4 gap-3 shrink-0">
+        <header className="h-14 border-b border-border flex items-center px-4 gap-2 shrink-0">
+          {/* Mobile toggle: history */}
+          <button
+            className="lg:hidden p-1.5 rounded-lg text-muted hover:text-text hover:bg-surface transition-colors"
+            onClick={() => setHistoryOpen((v) => !v)}
+            aria-label="Toggle history"
+          >
+            <History className="w-5 h-5" />
+          </button>
+          {/* Mobile toggle: pipeline */}
           <button
             className="md:hidden p-1.5 rounded-lg text-muted hover:text-text hover:bg-surface transition-colors"
-            onClick={() => setSidebarOpen((v) => !v)}
-            aria-label="Toggle sidebar"
+            onClick={() => setPipelineOpen((v) => !v)}
+            aria-label="Toggle pipeline"
           >
             <Menu className="w-5 h-5" />
           </button>
 
-          <div className="flex items-center gap-2 flex-1">
-            <svg width="16" height="12" viewBox="0 0 28 20" fill="none" aria-hidden>
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <svg width="16" height="12" viewBox="0 0 28 20" fill="none" aria-hidden className="shrink-0">
               <polygon points="2,2 2,18 22,10" fill="#64FFDA" opacity="0.9" />
               <polygon points="22,4 22,16 27,10" fill="#64FFDA" opacity="0.55" />
             </svg>
             <span className="font-display font-semibold text-bright text-sm">MiroFish</span>
-            <span className={cn('font-mono text-xs ml-2', statusColor)}>· {pipelineStatus}</span>
+            <span className={cn('font-mono text-xs ml-1 truncate', statusColor)}>· {pipelineStatus}</span>
           </div>
 
           {/* Credits in chat header */}
@@ -593,7 +963,7 @@ function ChatWorkspace() {
             <button
               onClick={() => setShowBuyModal(true)}
               className={cn(
-                'inline-flex items-center gap-1 font-mono text-xs px-2.5 py-1 rounded-full border transition-all',
+                'inline-flex items-center gap-1 font-mono text-xs px-2.5 py-1 rounded-full border transition-all shrink-0',
                 isSubscribed
                   ? 'border-mint/30 bg-mint/10 text-mint hover:bg-mint/20'
                   : credits === 0
@@ -610,10 +980,11 @@ function ChatWorkspace() {
 
           <button
             onClick={resetChat}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono text-muted hover:text-text hover:bg-surface border border-transparent hover:border-border transition-all"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono text-muted hover:text-text hover:bg-surface border border-transparent hover:border-border transition-all shrink-0"
             aria-label="Reset chat"
           >
-            <RotateCcw className="w-3.5 h-3.5" />Reset
+            <RotateCcw className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Reset</span>
           </button>
         </header>
 
@@ -670,7 +1041,6 @@ function ChatWorkspace() {
 
         {/* Input area */}
         <div className="shrink-0 border-t border-border p-4">
-          {/* Toast */}
           {toastMsg && (
             <div className="mb-3 flex items-center gap-2 px-4 py-2.5 rounded-xl bg-coral/10 border border-coral/30">
               <Lock className="w-3.5 h-3.5 text-coral shrink-0" />
