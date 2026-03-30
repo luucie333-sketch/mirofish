@@ -1433,7 +1433,7 @@ function ChatWorkspace() {
                 <Paperclip className="w-4 h-4" />
               </button>
               <button
-                onClick={sendMessage}
+                onClick={() => sendMessage()}
                 disabled={isLoading || !input.trim()}
                 className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-mint text-bg text-xs font-semibold font-mono hover:bg-mint/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-glow-mint"
                 aria-label="Send message"
