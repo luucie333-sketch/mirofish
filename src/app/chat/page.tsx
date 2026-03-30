@@ -155,7 +155,94 @@ function FileChip({ file, onRemove }: { file: File; onRemove: () => void }) {
   );
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://204.168.158.228:5001';
+// ─── Backend URL ───────────────────────────────────────────────────────────────
+const API_URL = 'http://161.35.124.54:5001';
+
+// ─── HTTP helpers ──────────────────────────────────────────────────────────────
+
+async function postJson(url: string, body: object): Promise<any> {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`${url} returned ${res.status}`);
+  return res.json();
+}
+
+async function postFormData(url: string, data: { simulation_requirement: string; files: File[] }): Promise<any> {
+  const fd = new FormData();
+  fd.append('simulation_requirement', data.simulation_requirement);
+  data.files.forEach((f) => fd.append('files', f));
+  const res = await fetch(url, { method: 'POST', body: fd });
+  if (!res.ok) throw new Error(`${url} returned ${res.status}`);
+  return res.json();
+}
+
+async function fetchJson(url: string): Promise<any> {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`${url} returned ${res.status}`);
+  return res.json();
+}
+
+// ─── Polling helpers ───────────────────────────────────────────────────────────
+
+async function pollUntilComplete(url: string, interval: number, timeout: number): Promise<any> {
+  const start = Date.now();
+  while (Date.now() - start < timeout) {
+    const res = await fetchJson(url);
+    const status: string = res.data?.status ?? res.data?.runner_status ?? '';
+    if (status === 'completed' || status === 'finished') return res;
+    if (status === 'failed' || status === 'error') throw new Error(res.data?.error ?? res.data?.message ?? 'Step failed');
+    await new Promise((r) => setTimeout(r, interval));
+  }
+  throw new Error('Polling timed out');
+}
+
+async function pollPrepareStatus(simId: string, interval: number, timeout: number): Promise<any> {
+  const start = Date.now();
+  while (Date.now() - start < timeout) {
+    const res = await postJson(`${API_URL}/api/simulation/prepare/status`, { simulation_id: simId });
+    const status: string = res.data?.status ?? '';
+    if (status === 'completed' || status === 'ready') return res;
+    if (status === 'failed') throw new Error(res.data?.error ?? 'Preparation failed');
+    await new Promise((r) => setTimeout(r, interval));
+  }
+  throw new Error('Preparation timed out');
+}
+
+async function pollSimulationStatus(
+  simId: string,
+  interval: number,
+  timeout: number,
+  onProgress: (data: { current_round: number; total_rounds: number; progress_percent: number }) => void,
+): Promise<any> {
+  const start = Date.now();
+  while (Date.now() - start < timeout) {
+    const res = await fetchJson(`${API_URL}/api/simulation/${simId}/run-status`);
+    const d = res.data ?? {};
+    const status: string = d.runner_status ?? '';
+    if (status === 'completed' || status === 'finished') return res;
+    if (status === 'failed') throw new Error(d.error ?? 'Simulation failed');
+    if (d.current_round) onProgress(d);
+    await new Promise((r) => setTimeout(r, interval));
+  }
+  throw new Error('Simulation timed out');
+}
+
+async function pollReportStatus(taskId: string, simId: string, interval: number, timeout: number): Promise<any> {
+  const start = Date.now();
+  while (Date.now() - start < timeout) {
+    const res = await postJson(`${API_URL}/api/report/generate/status`, { task_id: taskId, simulation_id: simId });
+    const status: string = res.data?.status ?? '';
+    if (status === 'completed') return res;
+    if (status === 'failed') throw new Error(res.data?.error ?? 'Report generation failed');
+    await new Promise((r) => setTimeout(r, interval));
+  }
+  throw new Error('Report generation timed out');
+}
+
+// ─── Chat workspace ────────────────────────────────────────────────────────────
 
 function ChatWorkspace() {
   const searchParams = useSearchParams();
@@ -167,9 +254,14 @@ function ChatWorkspace() {
   const [activeStage, setActiveStage] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [abortController, setAbortController] = useState<AbortController | null>(null);
   const [outOfCredits, setOutOfCredits] = useState(false);
   const [toastMsg, setToastMsg] = useState('');
+
+  // Pipeline state
+  const [projectId, setProjectId] = useState<string | null>(null);
+  const [simulationId, setSimulationId] = useState<string | null>(null);
+  const [pipelineComplete, setPipelineComplete] = useState(false);
+  const [chatHistory, setChatHistory] = useState<{ role: string; content: string }[]>([]);
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -179,7 +271,6 @@ function ChatWorkspace() {
   useEffect(() => { document.title = 'Chat Workspace | MiroFish'; }, []);
   useEffect(() => { setSidebarOpen(window.innerWidth > 768); }, []);
 
-  // Auto-open Buy Credits modal when user lands with 0 credits
   useEffect(() => {
     if (credits === 0) {
       setShowBuyModal(true);
@@ -203,41 +294,24 @@ function ChatWorkspace() {
     setTimeout(() => setToastMsg(''), 4000);
   }
 
-  const simulateStages = useCallback((signal: AbortSignal): (() => void) => {
-    const timers: ReturnType<typeof setTimeout>[] = [];
-    const steps: [number, string, StageStatus, string | undefined, string | undefined, StageStatus | undefined][] = [
-      [800, 'seed', 'running', undefined, undefined, undefined],
-      [1800, 'seed', 'done', 'Decomposed 4 seed nodes', 'graph', 'running'],
-      [3200, 'graph', 'done', 'Built 12-node graph', 'simulation', 'running'],
-      [5200, 'simulation', 'done', 'Ran 8 agent iterations', 'report', 'running'],
-      [6800, 'report', 'done', 'Report ready', undefined, undefined],
-    ];
-    steps.forEach(([delay, id, status, detail, nextId, nextStatus]) => {
-      const t = setTimeout(() => {
-        if (signal.aborted) return;
-        setStages((prev) => prev.map((s) => {
-          if (s.id === id) return { ...s, status, detail };
-          if (nextId && s.id === nextId && nextStatus) return { ...s, status: nextStatus };
-          return s;
-        }));
-        setActiveStage(nextId ?? (status === 'done' ? null : id));
-      }, delay);
-      timers.push(t);
-    });
-    return () => timers.forEach(clearTimeout);
+  const updateStage = useCallback((id: string, status: StageStatus, detail?: string) => {
+    setStages((prev) => prev.map((s) => s.id === id ? { ...s, status, detail } : s));
+    setActiveStage(status === 'running' ? id : null);
   }, []);
 
   const resetChat = useCallback(() => {
-    abortController?.abort();
     setMessages([]);
     setInput('');
     setIsLoading(false);
     setStages(INITIAL_STAGES);
     setActiveStage(null);
     setFile(null);
-    setAbortController(null);
     setOutOfCredits(false);
-  }, [abortController]);
+    setProjectId(null);
+    setSimulationId(null);
+    setPipelineComplete(false);
+    setChatHistory([]);
+  }, []);
 
   const sendMessage = useCallback(async () => {
     const text = input.trim();
@@ -245,7 +319,6 @@ function ChatWorkspace() {
 
     // 1. Client-side credit guard — instant, no round trip
     if (credits === null) {
-      // Not loaded yet — verify via API
       const authCheck = await fetch('/api/credits/balance');
       if (authCheck.status === 401) { router.push('/auth/signin'); return; }
     }
@@ -272,65 +345,165 @@ function ChatWorkspace() {
     // Credit deducted — update balance display
     refreshCredits();
 
-    const ac = new AbortController();
-    setAbortController(ac);
-
     const userMsg: Message = { id: randomId(), role: 'user', content: text, timestamp: new Date() };
     const assistantId = randomId();
     const assistantMsg: Message = {
-      id: assistantId, role: 'assistant', content: 'Analysing your scenario…', timestamp: new Date(), isStreaming: true,
+      id: assistantId,
+      role: 'assistant',
+      content: pipelineComplete ? 'Thinking…' : 'Analysing your scenario…',
+      timestamp: new Date(),
+      isStreaming: true,
     };
 
     setMessages((prev) => [...prev, userMsg, assistantMsg]);
     setInput('');
     setIsLoading(true);
-    setStages(INITIAL_STAGES);
-    setActiveStage(null);
 
-    const cancelStages = simulateStages(ac.signal);
+    if (!pipelineComplete) {
+      // ── FIRST MESSAGE — run full pipeline ────────────────────────────────────
+      setStages(INITIAL_STAGES);
+      setActiveStage(null);
 
-    try {
-      const body = new FormData();
-      body.append('message', text);
-      if (file) body.append('file', file);
+      let failedStageName = 'pipeline';
 
-      const res = await fetch(`${API_URL}/api/report/chat`, {
-        method: 'POST',
-        body,
-        signal: ac.signal,
-      });
+      try {
+        // Step 1: Ontology / Seed Analysis
+        failedStageName = 'Seed Analysis';
+        updateStage('seed', 'running', 'Analyzing your scenario…');
+        const ontologyRes = await postFormData(`${API_URL}/api/graph/ontology/generate`, {
+          simulation_requirement: text,
+          files: file ? [file] : [],
+        });
+        if (!ontologyRes.success) throw new Error(ontologyRes.message ?? 'Ontology generation failed');
+        const newProjectId: string = ontologyRes.data.project_id;
+        setProjectId(newProjectId);
+        const charCount: number = ontologyRes.data.total_text_length ?? 0;
+        updateStage('seed', 'done', `Project ${newProjectId} created · ${charCount} chars`);
 
-      if (!res.ok) throw new Error(`Server responded with ${res.status}`);
-      const data = await res.json();
-      const reply = data?.response ?? data?.message ?? data?.text ?? JSON.stringify(data);
+        // Step 2: Graph Building
+        failedStageName = 'Graph Building';
+        updateStage('graph', 'running', 'Building knowledge graph…');
+        const buildRes = await postJson(`${API_URL}/api/graph/build`, { project_id: newProjectId });
+        if (!buildRes.success) throw new Error(buildRes.message ?? 'Graph build failed');
+        const graphTaskId: string = buildRes.data.task_id;
+        await pollUntilComplete(`${API_URL}/api/graph/task/${graphTaskId}`, 3000, 300000);
+        updateStage('graph', 'done', 'Knowledge graph built');
 
-      setMessages((prev) =>
-        prev.map((m) => m.id === assistantId ? { ...m, content: reply, isStreaming: false } : m)
-      );
-    } catch (err) {
-      if (err instanceof Error && err.name === 'AbortError') {
+        // Step 3: Create Simulation
+        failedStageName = 'Multi-Agent Simulation';
+        updateStage('simulation', 'running', 'Creating simulation…');
+        const simCreateRes = await postJson(`${API_URL}/api/simulation/create`, {
+          project_id: newProjectId,
+          enable_twitter: true,
+          enable_reddit: true,
+        });
+        if (!simCreateRes.success) throw new Error(simCreateRes.message ?? 'Simulation creation failed');
+        const newSimId: string = simCreateRes.data.simulation_id;
+        setSimulationId(newSimId);
+
+        // Step 4: Prepare Simulation
+        updateStage('simulation', 'running', 'Preparing agents…');
+        await postJson(`${API_URL}/api/simulation/prepare`, { simulation_id: newSimId });
+        await pollPrepareStatus(newSimId, 5000, 300000);
+
+        // Step 5: Start Simulation
+        updateStage('simulation', 'running', 'Running simulation…');
+        await postJson(`${API_URL}/api/simulation/start`, { simulation_id: newSimId, platform: 'parallel' });
+        await pollSimulationStatus(newSimId, 5000, 900000, (progress) => {
+          updateStage(
+            'simulation',
+            'running',
+            `Round ${progress.current_round}/${progress.total_rounds} — ${progress.progress_percent}%`,
+          );
+        });
+        updateStage('simulation', 'done', 'Simulation complete');
+
+        // Step 6: Generate Report
+        failedStageName = 'Structured Report';
+        updateStage('report', 'running', 'Generating report…');
+        const reportGenRes = await postJson(`${API_URL}/api/report/generate`, { simulation_id: newSimId });
+        if (!reportGenRes.success) throw new Error(reportGenRes.message ?? 'Report generation failed');
+        const reportTaskId: string = reportGenRes.data.task_id;
+        await pollReportStatus(reportTaskId, newSimId, 5000, 300000);
+        updateStage('report', 'done', 'Report ready');
+
+        // Fetch report and display as first assistant message
+        const reportData = await fetchJson(`${API_URL}/api/report/by-simulation/${newSimId}`);
+        const reportContent: string =
+          reportData?.data?.content ??
+          reportData?.data?.report ??
+          reportData?.data?.summary ??
+          JSON.stringify(reportData?.data ?? reportData);
+
+        setPipelineComplete(true);
+        setChatHistory([
+          { role: 'user', content: text },
+          { role: 'assistant', content: reportContent },
+        ]);
+
         setMessages((prev) =>
-          prev.map((m) => m.id === assistantId ? { ...m, content: 'Request cancelled.', isStreaming: false } : m)
+          prev.map((m) => m.id === assistantId ? { ...m, content: reportContent, isStreaming: false } : m)
         );
-      } else {
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        setStages((prev) =>
+          prev.map((s) => s.status === 'running' ? { ...s, status: 'error', detail: errMsg } : s)
+        );
+        setActiveStage(null);
         setMessages((prev) =>
           prev.map((m) =>
             m.id === assistantId
-              ? { ...m, content: 'The prediction engine is currently offline. The backend may be unavailable. You can run your own instance from the GitHub repository.', isStreaming: false, isError: true }
+              ? {
+                  ...m,
+                  content: `Pipeline failed at ${failedStageName}: ${errMsg}. Please click Reset and try again.`,
+                  isStreaming: false,
+                  isError: true,
+                }
               : m
           )
         );
-        setStages((prev) =>
-          prev.map((s) => ['pending', 'running'].includes(s.status) ? { ...s, status: 'error' } : s)
-        );
+      } finally {
+        setIsLoading(false);
+        setFile(null);
       }
-    } finally {
-      cancelStages();
-      setIsLoading(false);
-      setFile(null);
-      setAbortController(null);
+    } else {
+      // ── FOLLOW-UP MESSAGE — chat with report agent ───────────────────────────
+      try {
+        const res = await postJson(`${API_URL}/api/report/chat`, {
+          simulation_id: simulationId,
+          message: text,
+          chat_history: chatHistory,
+        });
+        if (!res.success) throw new Error(res.message ?? 'Chat failed');
+        const reply: string =
+          res.data?.response ??
+          res.data?.message ??
+          res.data?.text ??
+          JSON.stringify(res.data);
+
+        setChatHistory((prev) => [
+          ...prev,
+          { role: 'user', content: text },
+          { role: 'assistant', content: reply },
+        ]);
+
+        setMessages((prev) =>
+          prev.map((m) => m.id === assistantId ? { ...m, content: reply, isStreaming: false } : m)
+        );
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantId
+              ? { ...m, content: `Chat error: ${errMsg}. Please try again.`, isStreaming: false, isError: true }
+              : m
+          )
+        );
+      } finally {
+        setIsLoading(false);
+      }
     }
-  }, [input, isLoading, credits, file, simulateStages, router, refreshCredits, setShowBuyModal]);
+  }, [input, isLoading, credits, file, pipelineComplete, simulationId, chatHistory, updateStage, router, refreshCredits, setShowBuyModal]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
@@ -486,7 +659,7 @@ function ChatWorkspace() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={credits === 0 ? 'Buy credits to continue…' : 'Ask a follow-up question…'}
+              placeholder={credits === 0 ? 'Buy credits to continue…' : pipelineComplete ? 'Ask a follow-up question…' : 'Describe your prediction scenario…'}
               rows={1}
               disabled={isLoading}
               className="bg-transparent text-text text-sm placeholder:text-muted/50 w-full px-3 py-2 focus:outline-none resize-none min-h-[36px] max-h-[100px] leading-5 disabled:opacity-60"
@@ -494,7 +667,7 @@ function ChatWorkspace() {
             <div className="flex items-center justify-between px-1 pt-1">
               <button
                 onClick={() => fileRef.current?.click()}
-                disabled={isLoading}
+                disabled={isLoading || pipelineComplete}
                 className="p-1.5 rounded-lg text-muted hover:text-text hover:bg-card transition-colors disabled:opacity-40"
                 aria-label="Attach file"
                 type="button"
