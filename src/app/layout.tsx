@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { CreditsProvider } from '@/components/providers/CreditsProvider';
 import BuyCreditsModal from '@/components/credits/BuyCreditsModal';
+import { SpeedInsights } from '@vercel/speed-insights/next';
 
 export const metadata: Metadata = {
   title: 'MiroFish | AI Simulation Chat for Scenario Prediction',
@@ -43,6 +44,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           {children}
           <BuyCreditsModal />
         </CreditsProvider>
+        <SpeedInsights />
       </body>
     </html>
   );
