@@ -78,8 +78,8 @@ function Header() {
       <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-2 select-none group">
           <svg width="28" height="20" viewBox="0 0 28 20" fill="none" aria-hidden>
-            <polygon points="2,2 2,18 22,10" fill="#64FFDA" opacity="0.9" className="group-hover:opacity-100 transition-opacity" />
-            <polygon points="22,4 22,16 27,10" fill="#64FFDA" opacity="0.55" className="group-hover:opacity-80 transition-opacity" />
+            <polygon points="2,2 2,18 22,10" fill="#0FA68C" opacity="0.9" className="group-hover:opacity-100 transition-opacity" />
+            <polygon points="22,4 22,16 27,10" fill="#0FA68C" opacity="0.55" className="group-hover:opacity-80 transition-opacity" />
           </svg>
           <span className="font-display font-700 text-lg text-bright leading-none">MiroFish</span>
           <span className="font-mono text-xs text-mint/60 leading-none -ml-0.5">.us</span>
@@ -148,7 +148,7 @@ function HeroSection({
         {/* Headline */}
         <h1 className="font-display font-800 text-4xl sm:text-5xl lg:text-6xl xl:text-7xl text-bright leading-[1.05] tracking-tight mb-6">
           See What Happens
-          <span className="block mt-1" style={{ color: '#64FFDA', textShadow: '0 0 40px rgba(100,255,218,0.3)' }}>
+          <span className="block mt-1" style={{ color: '#0FA68C', textShadow: '0 0 40px rgba(15,166,140,0.2)' }}>
             Before It Happens
           </span>
         </h1>
@@ -755,8 +755,8 @@ function Footer() {
           <div className="max-w-xs">
             <Link href="/" className="flex items-center gap-2 mb-3 select-none">
               <svg width="24" height="17" viewBox="0 0 28 20" fill="none" aria-hidden>
-                <polygon points="2,2 2,18 22,10" fill="#64FFDA" opacity="0.9" />
-                <polygon points="22,4 22,16 27,10" fill="#64FFDA" opacity="0.55" />
+                <polygon points="2,2 2,18 22,10" fill="#0FA68C" opacity="0.9" />
+                <polygon points="22,4 22,16 27,10" fill="#0FA68C" opacity="0.55" />
               </svg>
               <span className="font-display font-700 text-base text-bright">MiroFish</span>
               <span className="font-mono text-xs text-mint/60 -ml-0.5">.us</span>

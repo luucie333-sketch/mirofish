@@ -38,6 +38,7 @@ interface Message {
   timestamp: Date;
   isStreaming?: boolean;
   isError?: boolean;
+  isPipelineError?: boolean;
   isReport?: boolean;
 }
 
@@ -47,6 +48,7 @@ interface StoredMessage {
   content: string;
   timestamp: string;
   isError?: boolean;
+  isPipelineError?: boolean;
   isReport?: boolean;
 }
 
@@ -80,6 +82,7 @@ function serializeMessage(m: Message): StoredMessage {
     content: m.content,
     timestamp: m.timestamp instanceof Date ? m.timestamp.toISOString() : String(m.timestamp),
     isError: m.isError,
+    isPipelineError: m.isPipelineError,
     isReport: m.isReport,
   };
 }
@@ -95,6 +98,7 @@ function parseMessages(stored: StoredMessage[]): Message[] {
     content: m.content,
     timestamp: new Date(m.timestamp),
     isError: m.isError ?? false,
+    isPipelineError: m.isPipelineError ?? false,
     isStreaming: false,
     isReport: m.isReport ?? false,
   }));
@@ -516,7 +520,7 @@ function ReportCard({
     <div className="message-in w-full">
       {stats && <StatsBar stats={stats} />}
 
-      <div id="mirofish-report" className="rounded-2xl border border-mint/20 bg-gradient-to-b from-[#0a1a15] to-card overflow-hidden shadow-[0_4px_40px_rgba(0,0,0,0.7)] relative">
+      <div id="mirofish-report" className="rounded-2xl border border-mint/20 bg-card overflow-hidden shadow-card relative">
         {/* Top accent line */}
         <div className="h-px bg-gradient-to-r from-transparent via-mint/50 to-transparent" aria-hidden />
 
@@ -569,6 +573,76 @@ function ReportCard({
   );
 }
 
+/* ─── Pipeline error banners ─────────────────────────────────────────────────── */
+
+function PipelineErrorBanner({
+  isSubscribed, onUpgrade, onRetry,
+}: { isSubscribed: boolean; onUpgrade: () => void; onRetry: () => void }) {
+  if (isSubscribed) {
+    return (
+      <div className="flex justify-start message-in">
+        <div className="max-w-2xl w-full rounded-2xl rounded-bl-sm border border-coral/30 bg-coral/5 px-5 py-4">
+          <p className="text-sm text-coral/90 leading-relaxed">
+            This prediction encountered an error. Please click{' '}
+            <button
+              type="button"
+              onClick={onRetry}
+              className="font-600 underline underline-offset-2 hover:text-coral transition-colors"
+            >
+              Reset
+            </button>{' '}
+            and try again. Our team has been notified.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex justify-start message-in">
+      <div className="max-w-2xl w-full rounded-2xl border border-amber/30 bg-amber/5 overflow-hidden">
+        {/* Amber top accent */}
+        <div className="h-0.5 bg-gradient-to-r from-amber/60 via-amber/80 to-amber/60" aria-hidden />
+        <div className="px-5 py-4 space-y-4">
+          <div className="flex gap-3">
+            <div className="shrink-0 w-8 h-8 rounded-full bg-amber/10 border border-amber/20 flex items-center justify-center">
+              <Zap className="w-4 h-4 text-amber" />
+            </div>
+            <div>
+              <p className="font-display font-600 text-sm text-amber/90 mb-1">
+                Prediction failed due to high server demand
+              </p>
+              <p className="text-sm text-muted leading-relaxed">
+                Upgrade to{' '}
+                <span className="font-600 text-text">Unlimited ($29.99/mo)</span>{' '}
+                for priority processing and faster results.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={onUpgrade}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-mint text-bg font-display font-700 text-sm hover:bg-mint-dim transition-colors shadow-glow-mint"
+            >
+              <Zap className="w-3.5 h-3.5" />
+              Upgrade Now
+            </button>
+            <button
+              type="button"
+              onClick={onRetry}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-border text-muted font-display font-600 text-sm hover:border-mint/30 hover:text-text transition-colors"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              Retry
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AssistantMessage({
   content, timestamp, isStreaming, isError,
 }: { content: string; timestamp: Date; isStreaming?: boolean; isError?: boolean }) {
@@ -577,8 +651,8 @@ function AssistantMessage({
       <div className="flex flex-col items-start gap-1 max-w-2xl">
         <div className="flex items-center gap-1 pl-1">
           <svg width="12" height="9" viewBox="0 0 28 20" fill="none" aria-hidden>
-            <polygon points="2,2 2,18 22,10" fill="#64FFDA" opacity="0.9" />
-            <polygon points="22,4 22,16 27,10" fill="#64FFDA" opacity="0.55" />
+            <polygon points="2,2 2,18 22,10" fill="#0FA68C" opacity="0.9" />
+            <polygon points="22,4 22,16 27,10" fill="#0FA68C" opacity="0.55" />
           </svg>
           <span className="font-mono text-xs text-muted">MiroFish</span>
         </div>
@@ -615,9 +689,15 @@ function SystemMessage({ content, timestamp }: { content: string; timestamp: Dat
 }
 
 function MessageItem({
-  role, content, timestamp, isStreaming, isError, isReport,
-  simStats, onSuggest,
-}: Message & { simStats?: SimStats | null; onSuggest?: (q: string) => void }) {
+  role, content, timestamp, isStreaming, isError, isPipelineError, isReport,
+  simStats, onSuggest, isSubscribed, onUpgrade, onRetry,
+}: Message & {
+  simStats?: SimStats | null;
+  onSuggest?: (q: string) => void;
+  isSubscribed?: boolean;
+  onUpgrade?: () => void;
+  onRetry?: () => void;
+}) {
   if (role === 'user') return <UserMessage content={content} timestamp={timestamp} />;
   if (role === 'system') return <SystemMessage content={content} timestamp={timestamp} />;
   if (isReport) {
@@ -627,6 +707,15 @@ function MessageItem({
         stats={simStats ?? null}
         timestamp={timestamp}
         onSuggest={onSuggest ?? (() => {})}
+      />
+    );
+  }
+  if (isPipelineError && onUpgrade && onRetry) {
+    return (
+      <PipelineErrorBanner
+        isSubscribed={isSubscribed ?? false}
+        onUpgrade={onUpgrade}
+        onRetry={onRetry}
       />
     );
   }
@@ -1157,9 +1246,10 @@ function ChatWorkspace() {
             m.id === assistantId
               ? {
                   ...m,
-                  content: `Pipeline failed at ${failedStageName}: ${errMsg}. Please click Reset and try again.`,
+                  content: `Pipeline failed at ${failedStageName}: ${errMsg}.`,
                   isStreaming: false,
                   isError: true,
+                  isPipelineError: true,
                 }
               : m
           )
@@ -1299,8 +1389,8 @@ function ChatWorkspace() {
 
           <div className="flex items-center gap-2 flex-1 min-w-0">
             <svg width="16" height="12" viewBox="0 0 28 20" fill="none" aria-hidden className="shrink-0">
-              <polygon points="2,2 2,18 22,10" fill="#64FFDA" opacity="0.9" />
-              <polygon points="22,4 22,16 27,10" fill="#64FFDA" opacity="0.55" />
+              <polygon points="2,2 2,18 22,10" fill="#0FA68C" opacity="0.9" />
+              <polygon points="22,4 22,16 27,10" fill="#0FA68C" opacity="0.55" />
             </svg>
             <span className="font-display font-semibold text-bright text-sm">MiroFish</span>
             <span className={cn('font-mono text-xs ml-1 truncate', statusColor)}>· {pipelineStatus}</span>
@@ -1376,8 +1466,8 @@ function ChatWorkspace() {
           {messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full gap-3 select-none">
               <svg width="48" height="34" viewBox="0 0 28 20" fill="none" className="opacity-30" aria-hidden>
-                <polygon points="2,2 2,18 22,10" fill="#64FFDA" opacity="0.9" />
-                <polygon points="22,4 22,16 27,10" fill="#64FFDA" opacity="0.55" />
+                <polygon points="2,2 2,18 22,10" fill="#0FA68C" opacity="0.9" />
+                <polygon points="22,4 22,16 27,10" fill="#0FA68C" opacity="0.55" />
               </svg>
               <p className="text-muted font-mono text-sm">Enter a prediction prompt to begin</p>
             </div>
@@ -1388,6 +1478,9 @@ function ChatWorkspace() {
                 {...m}
                 simStats={m.isReport ? simStats : null}
                 onSuggest={m.isReport ? handleSuggest : undefined}
+                isSubscribed={isSubscribed ?? false}
+                onUpgrade={m.isPipelineError ? () => setShowBuyModal(true) : undefined}
+                onRetry={m.isPipelineError ? resetChat : undefined}
               />
             ))
           )}
@@ -1465,10 +1558,10 @@ export default function ChatPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex h-screen items-center justify-center bg-[#07070F]">
+        <div className="flex h-screen items-center justify-center bg-bg">
           <div className="flex flex-col items-center gap-4">
-            <div className="w-8 h-8 rounded-full border-2 border-[#64FFDA] border-t-transparent animate-spin" />
-            <p className="font-mono text-xs text-[#60607A]">Loading workspace…</p>
+            <div className="w-8 h-8 rounded-full border-2 border-mint border-t-transparent animate-spin" />
+            <p className="font-mono text-xs text-muted">Loading workspace…</p>
           </div>
         </div>
       }

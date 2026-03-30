@@ -64,8 +64,8 @@ export default function SignInPage() {
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2 mb-8 justify-center select-none">
           <svg width="28" height="20" viewBox="0 0 28 20" fill="none" aria-hidden>
-            <polygon points="2,2 2,18 22,10" fill="#64FFDA" opacity="0.9" />
-            <polygon points="22,4 22,16 27,10" fill="#64FFDA" opacity="0.55" />
+            <polygon points="2,2 2,18 22,10" fill="#0FA68C" opacity="0.9" />
+            <polygon points="22,4 22,16 27,10" fill="#0FA68C" opacity="0.55" />
           </svg>
           <span className="font-display font-700 text-xl text-bright">MiroFish</span>
           <span className="font-mono text-xs text-mint/60">.us</span>

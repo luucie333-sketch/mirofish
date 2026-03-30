@@ -130,7 +130,7 @@ export default function DemoReport() {
   const toggle = (i: number) => setOpenIndex(openIndex === i ? -1 : i);
 
   return (
-    <div className="rounded-2xl border border-mint/20 bg-gradient-to-b from-[#0a1a15] to-card overflow-hidden shadow-[0_4px_48px_rgba(0,0,0,0.7)] relative">
+    <div className="rounded-2xl border border-mint/20 bg-card overflow-hidden shadow-[0_4px_24px_rgba(0,0,0,0.1)] relative">
       {/* Top accent line */}
       <div className="h-px bg-gradient-to-r from-transparent via-mint/60 to-transparent" aria-hidden />
 

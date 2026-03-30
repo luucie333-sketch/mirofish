@@ -21,8 +21,8 @@ html {
 }
 
 body {
-  background-color: #07070f;
-  color: #e2e2f0;
+  background-color: #F5F2EB;
+  color: #1A1A2E;
   font-family: var(--font-jakarta);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -34,34 +34,34 @@ body {
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #0e0e1a;
+  background: #EDE9E0;
 }
 ::-webkit-scrollbar-thumb {
-  background: #2a2a48;
+  background: #C8C4BB;
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #64ffda44;
+  background: #0FA68C88;
 }
 
 ::selection {
-  background: rgba(100, 255, 218, 0.2);
-  color: #64ffda;
+  background: rgba(15, 166, 140, 0.15);
+  color: #0D8F79;
 }
 
 .bg-grid {
   background-image:
-    linear-gradient(rgba(30, 30, 53, 0.5) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(30, 30, 53, 0.5) 1px, transparent 1px);
+    linear-gradient(rgba(224, 221, 213, 0.6) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(224, 221, 213, 0.6) 1px, transparent 1px);
   background-size: 48px 48px;
 }
 
 .glow-mint {
-  text-shadow: 0 0 20px rgba(100, 255, 218, 0.5);
+  text-shadow: 0 0 20px rgba(15, 166, 140, 0.3);
 }
 
 .glow-coral {
-  text-shadow: 0 0 20px rgba(255, 107, 107, 0.5);
+  text-shadow: 0 0 20px rgba(217, 79, 79, 0.3);
 }
 
 .bg-dots {
