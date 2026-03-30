@@ -231,6 +231,7 @@ async function pollSimulationStatus(
     if (status === 'completed' || status === 'finished') return res;
     if (status === 'failed') throw new Error(d.error ?? 'Simulation failed');
     if (d.current_round) onProgress(d);
+    if (d.progress_percent >= 100 || (d.total_rounds && d.current_round >= d.total_rounds)) return res;
     await new Promise((r) => setTimeout(r, interval));
   }
   throw new Error('Simulation timed out');
@@ -373,11 +374,28 @@ function ChatWorkspace() {
       let failedStageName = 'pipeline';
 
       try {
-        // Step 1: Ontology / Seed Analysis
+        // Step 0: Context Enrichment
         failedStageName = 'Seed Analysis';
+        updateStage('seed', 'running', 'Enriching context…');
+        let enrichedText = text;
+        try {
+          const enrichRes = await fetch('/api/enrich', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt: text }),
+          });
+          if (enrichRes.ok) {
+            const { enriched } = await enrichRes.json();
+            if (enriched) enrichedText = enriched;
+          }
+        } catch {
+          // Enrichment failure is non-fatal — continue with original prompt
+        }
+
+        // Step 1: Ontology / Seed Analysis
         updateStage('seed', 'running', 'Analyzing your scenario…');
         const ontologyRes = await postFormData(`${API_URL}/api/graph/ontology/generate`, {
-          simulation_requirement: text,
+          simulation_requirement: enrichedText,
           files: file ? [file] : [],
         });
         if (!ontologyRes.success) throw new Error(ontologyRes.message ?? 'Ontology generation failed');
@@ -415,7 +433,7 @@ function ChatWorkspace() {
         // Step 5: Start Simulation
         updateStage('simulation', 'running', 'Running simulation…');
         await postJson(`${API_URL}/api/simulation/start`, { simulation_id: newSimId, platform: 'parallel' });
-        await pollSimulationStatus(newSimId, 5000, 900000, (progress) => {
+        await pollSimulationStatus(newSimId, 5000, 1800000, (progress) => {
           updateStage(
             'simulation',
             'running',
