@@ -1183,7 +1183,7 @@ function ChatWorkspace() {
         const reportGenRes = await postJson(`${API_URL}/api/report/generate`, { simulation_id: newSimId });
         if (!reportGenRes.success) throw new Error(reportGenRes.message ?? 'Report generation failed');
         const reportTaskId: string = reportGenRes.data.task_id;
-        await pollReportStatus(reportTaskId, newSimId, 5000, 300000);
+        await pollReportStatus(reportTaskId, newSimId, 5000, 600000);
         updateStage('report', 'done', 'Report ready');
 
         // Fetch report and display as first assistant message
