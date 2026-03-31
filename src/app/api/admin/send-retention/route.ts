@@ -120,11 +120,14 @@ export async function POST() {
   }
 
   const service = createServiceClient();
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
   const { data: users, error } = await service
     .from('users')
-    .select('id, email')
+    .select('id, email, last_retention_email_at')
     .eq('credits', 0)
-    .neq('role', 'admin');
+    .neq('role', 'admin')
+    .or(`last_retention_email_at.is.null,last_retention_email_at.lt.${sevenDaysAgo}`);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!users || users.length === 0) return NextResponse.json({ sent: 0 });
@@ -150,7 +153,13 @@ export async function POST() {
       }),
     });
 
-    if (res.ok) sent++;
+    if (res.ok) {
+      sent++;
+      await service
+        .from('users')
+        .update({ last_retention_email_at: new Date().toISOString() })
+        .eq('id', user.id);
+    }
 
     await sleep(200);
   }
