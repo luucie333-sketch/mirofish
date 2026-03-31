@@ -118,6 +118,8 @@ export default function AdminPage() {
   const [requests, setRequests] = useState<CryptoRequest[]>([]);
   const [stats, setStats] = useState({ totalUsers: 0, pendingCrypto: 0, totalCreditsSold: 0 });
   const [loading, setLoading] = useState(false);
+  const [retentionLoading, setRetentionLoading] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
 
   const supabase = createClient();
 
@@ -159,6 +161,23 @@ export default function AdminPage() {
   useEffect(() => { checkAdmin(); }, [checkAdmin]);
   useEffect(() => { if (isAdmin) refresh(); }, [isAdmin, refresh]);
 
+  async function sendRetentionEmails() {
+    setRetentionLoading(true);
+    try {
+      const res = await fetch('/api/admin/send-retention', { method: 'POST' });
+      if (res.ok) {
+        const { sent } = await res.json();
+        setToast(`Sent ${sent} email${sent !== 1 ? 's' : ''}`);
+      } else {
+        setToast('Failed to send emails');
+      }
+    } catch {
+      setToast('Failed to send emails');
+    }
+    setRetentionLoading(false);
+    setTimeout(() => setToast(null), 4000);
+  }
+
   async function handleCryptoAction(requestId: string, action: 'confirm' | 'reject') {
     await fetch('/api/admin/crypto-requests', {
       method: 'PATCH',
@@ -178,6 +197,13 @@ export default function AdminPage() {
 
   return (
     <div className="min-h-screen bg-bg text-text font-body">
+      {/* Toast */}
+      {toast && (
+        <div className="fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl bg-mint text-bg font-mono text-sm shadow-lg animate-fade-in">
+          {toast}
+        </div>
+      )}
+
       {/* Header */}
       <header className="fixed top-0 inset-x-0 z-50 bg-bg/80 backdrop-blur-md border-b border-border">
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
@@ -204,7 +230,7 @@ export default function AdminPage() {
 
       <main className="max-w-6xl mx-auto px-6 pt-24 pb-16">
         {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           {[
             { label: 'Total Users', value: stats.totalUsers, icon: <Users className="w-5 h-5 text-mint" />, color: 'mint' },
             { label: 'Pending Crypto', value: stats.pendingCrypto, icon: <Bitcoin className="w-5 h-5 text-amber" />, color: 'amber' },
@@ -218,6 +244,19 @@ export default function AdminPage() {
               <span className={`font-display font-700 text-3xl text-${color}`}>{value}</span>
             </div>
           ))}
+        </div>
+
+        {/* Retention action */}
+        <div className="flex items-center gap-3 mb-8">
+          <button
+            onClick={sendRetentionEmails}
+            disabled={retentionLoading}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-mint/10 border border-mint/20 text-mint font-mono text-xs hover:bg-mint/20 transition-colors disabled:opacity-40"
+          >
+            <Zap className="w-3.5 h-3.5" />
+            {retentionLoading ? 'Sending…' : 'Send Retention Emails'}
+          </button>
+          <span className="font-mono text-xs text-muted">Emails users with 0 credits (max 50)</span>
         </div>
 
         {/* Tabs */}
