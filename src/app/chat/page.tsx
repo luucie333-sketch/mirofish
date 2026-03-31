@@ -488,6 +488,65 @@ function generateSuggestions(sectionTitles: string[]): string[] {
   return [...dynamic, ...fallbacks].slice(0, 3);
 }
 
+function calcConfidence(stats: SimStats): number {
+  return Math.min(95, Math.round(60 + (stats.agents * 2) + (stats.rounds * 0.5) + (stats.actions * 0.05)));
+}
+
+function extractTakeaways(content: string): string[] {
+  const sections = content.split(/^##\s+/m).slice(1);
+  return sections
+    .slice(0, 3)
+    .map((section) => {
+      const lines = section.split('\n').slice(1);
+      const firstLine = lines.find((l) => l.trim() && !l.startsWith('#') && !l.startsWith('-') && !l.startsWith('>'));
+      if (!firstLine) return '';
+      const clean = firstLine.replace(/\*\*/g, '').replace(/\*/g, '').trim();
+      return clean.split(/[.!?]/)[0].trim();
+    })
+    .filter(Boolean);
+}
+
+function ConfidenceBadge({ stats }: { stats: SimStats }) {
+  const score = calcConfidence(stats);
+  const isTeal = score >= 80;
+  const color = isTeal ? '#0FA68C' : '#F59E0B';
+  const r = 18;
+  const circ = 2 * Math.PI * r;
+  const dash = (score / 100) * circ;
+  return (
+    <div className="flex flex-col items-center gap-1 shrink-0">
+      <div className="relative w-12 h-12">
+        <svg viewBox="0 0 48 48" className="w-full h-full -rotate-90" aria-hidden>
+          <circle cx="24" cy="24" r={r} fill="none" stroke="#E5E7EB" strokeWidth="5" />
+          <circle cx="24" cy="24" r={r} fill="none" stroke={color} strokeWidth="5"
+            strokeDasharray={`${dash} ${circ}`} strokeLinecap="round" />
+        </svg>
+        <span className="absolute inset-0 flex items-center justify-center font-mono text-[11px] font-700" style={{ color }}>
+          {score}%
+        </span>
+      </div>
+      <span className="font-mono text-[9px] text-muted text-center leading-tight">Prediction<br/>Confidence</span>
+    </div>
+  );
+}
+
+function KeyTakeaways({ items }: { items: string[] }) {
+  if (items.length === 0) return null;
+  return (
+    <div className="mb-5 rounded-lg border-l-4 border-mint bg-mint/8 px-4 py-3" style={{ backgroundColor: '#E6F7F3', borderLeftColor: '#0FA68C' }}>
+      <p className="font-display font-700 text-sm text-text mb-2">🎯 Key Takeaways</p>
+      <ul className="space-y-1">
+        {items.map((item, i) => (
+          <li key={i} className="flex items-start gap-2 font-mono text-xs text-muted leading-relaxed">
+            <span className="text-mint shrink-0 mt-0.5">▸</span>
+            <span>{item}.</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function StatsBar({ stats }: { stats: SimStats }) {
   const mins = Math.max(1, Math.round(stats.durationMs / 60000));
   const items = [
@@ -515,6 +574,7 @@ function ReportCard({
   const body = content.replace(/^#\s+.+\n?/m, '').trim();
   const sections = [...content.matchAll(/^##\s+(.+)/gm)].map((m) => m[1].trim());
   const suggestions = generateSuggestions(sections);
+  const takeaways = extractTakeaways(content);
 
   return (
     <div className="message-in w-full">
@@ -532,18 +592,22 @@ function ReportCard({
             </span>
             <h1 className="font-display font-800 text-bright text-xl leading-snug">{title}</h1>
           </div>
-          <button
-            onClick={() => window.print()}
-            className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-border text-muted hover:text-text hover:border-mint/30 font-mono text-xs transition-all"
-            title="Download as PDF"
-          >
-            <Download className="w-3.5 h-3.5" />
-            PDF
-          </button>
+          <div className="flex items-center gap-3 shrink-0">
+            {stats && <ConfidenceBadge stats={stats} />}
+            <button
+              onClick={() => window.print()}
+              className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-border text-muted hover:text-text hover:border-mint/30 font-mono text-xs transition-all"
+              title="Download as PDF"
+            >
+              <Download className="w-3.5 h-3.5" />
+              PDF
+            </button>
+          </div>
         </div>
 
         {/* Body */}
         <div className="px-6 py-6">
+          <KeyTakeaways items={takeaways} />
           <ReportMarkdownRenderer content={body} />
         </div>
 
@@ -1076,6 +1140,30 @@ function ChatWorkspace() {
       let newProjectId = '';
       let newSimId = '';
 
+      const MAX_ATTEMPTS = 3;
+      const RETRY_DELAY = 5000;
+
+      async function withRetry<T>(
+        stageId: string,
+        label: string,
+        fn: () => Promise<T>,
+      ): Promise<T> {
+        let lastErr: Error = new Error('Unknown error');
+        for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+          try {
+            return await fn();
+          } catch (err) {
+            lastErr = err instanceof Error ? err : new Error(String(err));
+            const isAuthError = /unauth|forbidden|401|403/i.test(lastErr.message);
+            if (isAuthError || attempt === MAX_ATTEMPTS) throw lastErr;
+            updateStage(stageId, 'running', `Retrying… (attempt ${attempt + 1}/${MAX_ATTEMPTS})`);
+            await new Promise((r) => setTimeout(r, RETRY_DELAY));
+            updateStage(stageId, 'running', label);
+          }
+        }
+        throw lastErr;
+      }
+
       try {
         // Step 0: Context Enrichment
         failedStageName = 'Seed Analysis';
@@ -1097,11 +1185,15 @@ function ChatWorkspace() {
 
         // Step 1: Ontology / Seed Analysis
         updateStage('seed', 'running', 'Analyzing your scenario…');
-        const ontologyRes = await postFormData(`${API_URL}/api/graph/ontology/generate`, {
-          simulation_requirement: `Please generate all output in English.\n\n${enrichedText}`,
-          files: file ? [file] : [],
-        });
-        if (!ontologyRes.success) throw new Error(ontologyRes.message ?? 'Ontology generation failed');
+        const ontologyRes = await withRetry('seed', 'Analyzing your scenario…', () =>
+          postFormData(`${API_URL}/api/graph/ontology/generate`, {
+            simulation_requirement: `IMPORTANT: All simulation output, agent interactions, reports, and analysis MUST be in English only. Do not use any other language.\n\n${enrichedText}`,
+            files: file ? [file] : [],
+          }).then((res) => {
+            if (!res.success) throw new Error(res.message ?? 'Ontology generation failed');
+            return res;
+          })
+        );
         newProjectId = ontologyRes.data.project_id;
         setProjectId(newProjectId);
         const charCount: number = ontologyRes.data.total_text_length ?? 0;
@@ -1111,33 +1203,41 @@ function ChatWorkspace() {
         // Step 2: Graph Building
         failedStageName = 'Graph Building';
         updateStage('graph', 'running', 'Building knowledge graph…');
-        const buildRes = await postJson(`${API_URL}/api/graph/build`, { project_id: newProjectId });
-        if (!buildRes.success) throw new Error(buildRes.message ?? 'Graph build failed');
-        const graphTaskId: string = buildRes.data.task_id;
-        await pollUntilComplete(`${API_URL}/api/graph/task/${graphTaskId}`, 3000, 300000);
+        await withRetry('graph', 'Building knowledge graph…', async () => {
+          const buildRes = await postJson(`${API_URL}/api/graph/build`, { project_id: newProjectId });
+          if (!buildRes.success) throw new Error(buildRes.message ?? 'Graph build failed');
+          const graphTaskId: string = buildRes.data.task_id;
+          await pollUntilComplete(`${API_URL}/api/graph/task/${graphTaskId}`, 3000, 300000);
+        });
         updateStage('graph', 'done', 'Knowledge graph built');
 
         // Step 3: Create Simulation
         failedStageName = 'Multi-Agent Simulation';
         updateStage('simulation', 'running', 'Creating simulation…');
-        const simCreateRes = await postJson(`${API_URL}/api/simulation/create`, {
-          project_id: newProjectId,
-          enable_twitter: true,
-          enable_reddit: true,
-        });
-        if (!simCreateRes.success) throw new Error(simCreateRes.message ?? 'Simulation creation failed');
+        const simCreateRes = await withRetry('simulation', 'Creating simulation…', () =>
+          postJson(`${API_URL}/api/simulation/create`, {
+            project_id: newProjectId,
+            enable_twitter: true,
+            enable_reddit: true,
+          }).then((res) => {
+            if (!res.success) throw new Error(res.message ?? 'Simulation creation failed');
+            return res;
+          })
+        );
         newSimId = simCreateRes.data.simulation_id;
         setSimulationId(newSimId);
         if (sessionIdRef.current) void patchSession(sessionIdRef.current, { simulation_id: newSimId });
 
         // Step 4: Prepare Simulation
         updateStage('simulation', 'running', 'Preparing agents…');
-        await postJson(`${API_URL}/api/simulation/prepare`, { simulation_id: newSimId });
-        await pollPrepareStatus(newSimId, 5000, 300000);
+        await withRetry('simulation', 'Preparing agents…', async () => {
+          await postJson(`${API_URL}/api/simulation/prepare`, { simulation_id: newSimId });
+          await pollPrepareStatus(newSimId, 5000, 300000);
+        });
 
         // Step 5: Start Simulation (with 429 retry)
         updateStage('simulation', 'running', 'Running simulation…');
-        {
+        await withRetry('simulation', 'Running simulation…', async () => {
           const MAX_START_ATTEMPTS = 20;
           let startAttempt = 0;
           while (true) {
@@ -1156,16 +1256,19 @@ function ChatWorkspace() {
               throw new Error(errBody?.message ?? errBody?.error ?? `Simulation start failed (${startRes.status})`);
             }
           }
-          updateStage('simulation', 'running', 'Running simulation…');
-        }
-        simStartRef.current = Date.now();
-        const simResult = await pollSimulationStatus(newSimId, 5000, 1800000, (progress) => {
-          updateStage(
-            'simulation',
-            'running',
-            `Round ${progress.current_round}/${progress.total_rounds} — ${progress.progress_percent}%`,
-          );
         });
+        updateStage('simulation', 'running', 'Running simulation…');
+
+        simStartRef.current = Date.now();
+        const simResult = await withRetry('simulation', 'Running simulation…', () =>
+          pollSimulationStatus(newSimId, 5000, 1800000, (progress) => {
+            updateStage(
+              'simulation',
+              'running',
+              `Round ${progress.current_round}/${progress.total_rounds} — ${progress.progress_percent}%`,
+            );
+          })
+        );
         const simDurationMs = Date.now() - simStartRef.current;
         const sd = simResult?.data ?? {};
         const capturedStats: SimStats = {
@@ -1180,10 +1283,12 @@ function ChatWorkspace() {
         // Step 6: Generate Report
         failedStageName = 'Structured Report';
         updateStage('report', 'running', 'Generating report…');
-        const reportGenRes = await postJson(`${API_URL}/api/report/generate`, { simulation_id: newSimId });
-        if (!reportGenRes.success) throw new Error(reportGenRes.message ?? 'Report generation failed');
-        const reportTaskId: string = reportGenRes.data.task_id;
-        await pollReportStatus(reportTaskId, newSimId, 5000, 600000);
+        await withRetry('report', 'Generating report…', async () => {
+          const reportGenRes = await postJson(`${API_URL}/api/report/generate`, { simulation_id: newSimId });
+          if (!reportGenRes.success) throw new Error(reportGenRes.message ?? 'Report generation failed');
+          const reportTaskId: string = reportGenRes.data.task_id;
+          await pollReportStatus(reportTaskId, newSimId, 5000, 600000);
+        });
         updateStage('report', 'done', 'Report ready');
 
         // Fetch report and display as first assistant message
@@ -1235,6 +1340,24 @@ function ChatWorkspace() {
           });
           loadSessions();
         }
+
+        // Send report email in background
+        const emailTitle = reportContent.match(/^#\s+(.+)/m)?.[1]?.trim() ?? 'Prediction Report';
+        fetch('/api/reports/send-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            markdown_content: reportContent,
+            title: emailTitle,
+            stats: {
+              agents: capturedStats.agents,
+              rounds: capturedStats.rounds,
+              actions: capturedStats.actions,
+            },
+          }),
+        }).then((r) => {
+          if (r.ok) showToast('Report sent to your email ✓');
+        }).catch(() => {});
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : String(err);
         setStages((prev) =>
