@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { Suspense } from 'react';
 import './globals.css';
 import { CreditsProvider } from '@/components/providers/CreditsProvider';
 import BuyCreditsModal from '@/components/credits/BuyCreditsModal';
@@ -73,7 +74,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <CreditsProvider>
           {children}
-          <BuyCreditsModal />
+          <Suspense fallback={null}>
+            <BuyCreditsModal />
+          </Suspense>
         </CreditsProvider>
       </body>
     </html>
