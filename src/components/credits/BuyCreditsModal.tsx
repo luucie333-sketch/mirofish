@@ -6,17 +6,18 @@ import { CREDIT_PACKAGES, SUBSCRIPTION_PLAN } from '@/lib/credits';
 import { useCredits } from '@/components/providers/CreditsProvider';
 import PackageCard from './PackageCard';
 import CryptoPayment from './CryptoPayment';
+import PhantomCreditsCheckout from './PhantomCreditsCheckout';
 import SubscriptionCheckout from './SubscriptionCheckout';
 import PhantomSubscriptionCheckout from './PhantomSubscriptionCheckout';
 
 type Mode = 'subscription' | 'credits';
-type SubPayMethod = 'usdt' | 'sol';
+type PayMethod = 'usdt' | 'sol';
 
 export default function BuyCreditsModal() {
   const { credits, showBuyModal, setShowBuyModal, refresh, isSubscribed, subscriptionExpires } = useCredits();
   const [selectedPackage, setSelectedPackage] = useState('pro');
-  const [mode, setMode] = useState<Mode>('credits');
-  const [subPayMethod, setSubPayMethod] = useState<SubPayMethod>('usdt');
+  const [mode, setMode] = useState<Mode>('subscription');
+  const [payMethod, setPayMethod] = useState<PayMethod>('usdt');
   const [successMsg, setSuccessMsg] = useState('');
 
   if (!showBuyModal) return null;
@@ -147,35 +148,38 @@ export default function BuyCreditsModal() {
                 </p>
               )}
 
+              {/* ── Payment method tabs (shared) ── */}
+              <div className="flex gap-1 p-1 bg-card rounded-xl">
+                {(['usdt', 'sol'] as PayMethod[]).map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => setPayMethod(m)}
+                    className={`flex-1 py-2 rounded-lg font-display font-600 text-xs transition-all ${
+                      payMethod === m
+                        ? 'bg-surface text-bright shadow-card'
+                        : 'text-muted hover:text-text'
+                    }`}
+                  >
+                    {m === 'usdt' ? 'USDT' : 'SOL (Phantom)'}
+                  </button>
+                ))}
+              </div>
+
               {/* ── Payment area ── */}
               <div className="min-h-[160px]">
                 {mode === 'subscription' ? (
-                  <div className="space-y-3">
-                    {/* Sub payment method tabs */}
-                    <div className="flex gap-1 p-1 bg-card rounded-xl">
-                      {(['usdt', 'sol'] as SubPayMethod[]).map((m) => (
-                        <button
-                          key={m}
-                          type="button"
-                          onClick={() => setSubPayMethod(m)}
-                          className={`flex-1 py-2 rounded-lg font-display font-600 text-xs transition-all ${
-                            subPayMethod === m
-                              ? 'bg-surface text-bright shadow-card'
-                              : 'text-muted hover:text-text'
-                          }`}
-                        >
-                          {m === 'usdt' ? 'USDT' : 'SOL (Phantom)'}
-                        </button>
-                      ))}
-                    </div>
-                    {subPayMethod === 'usdt' ? (
-                      <SubscriptionCheckout onSuccess={handleSubscriptionSuccess} />
-                    ) : (
-                      <PhantomSubscriptionCheckout onSuccess={handleSubscriptionSuccess} />
-                    )}
-                  </div>
+                  payMethod === 'usdt' ? (
+                    <SubscriptionCheckout onSuccess={handleSubscriptionSuccess} />
+                  ) : (
+                    <PhantomSubscriptionCheckout onSuccess={handleSubscriptionSuccess} />
+                  )
                 ) : (
-                  <CryptoPayment packageId={selectedPackage} onSuccess={handleCryptoSuccess} />
+                  payMethod === 'usdt' ? (
+                    <CryptoPayment packageId={selectedPackage} onSuccess={handleCryptoSuccess} />
+                  ) : (
+                    <PhantomCreditsCheckout packageId={selectedPackage} onSuccess={handleCryptoSuccess} />
+                  )
                 )}
               </div>
             </>
