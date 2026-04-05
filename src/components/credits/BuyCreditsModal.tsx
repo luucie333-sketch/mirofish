@@ -27,6 +27,23 @@ export default function BuyCreditsModal() {
     if (purchaseRequired) setShowBuyModal(true);
   }, [purchaseRequired, setShowBuyModal]);
 
+  // Lock body scroll when modal is open (iOS-safe: use position:fixed technique)
+  useEffect(() => {
+    if (!showBuyModal) return;
+    const scrollY = window.scrollY;
+    document.body.style.overflow = 'hidden';
+    document.body.style.position = 'fixed';
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.width = '100%';
+    return () => {
+      document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.width = '';
+      window.scrollTo(0, scrollY);
+    };
+  }, [showBuyModal]);
+
   if (!showBuyModal) return null;
 
   function handleClose() {
@@ -51,9 +68,9 @@ export default function BuyCreditsModal() {
       <div className="absolute inset-0 bg-bg/80 backdrop-blur-sm" onClick={handleClose} aria-hidden />
 
       {/* Modal */}
-      <div className="relative w-full max-w-md bg-surface border border-border rounded-2xl shadow-card overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+      <div className="relative w-full max-w-md bg-surface border border-border rounded-2xl shadow-card flex flex-col max-h-[90vh]">
+        {/* Header — fixed, does not scroll */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border shrink-0">
           <div className="flex items-center gap-2">
             <Zap className="w-4 h-4 text-mint" />
             <span className="font-display font-600 text-bright text-sm">Buy Credits</span>
@@ -67,7 +84,7 @@ export default function BuyCreditsModal() {
           </button>
         </div>
 
-        <div className="p-6 space-y-4">
+        <div className="p-6 space-y-4 overflow-y-auto overscroll-contain">
           {/* Purchase required banner */}
           {purchaseRequired && !successMsg && (
             <div className="bg-amber/10 border border-amber/20 rounded-xl px-4 py-3">
