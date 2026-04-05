@@ -5,7 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import {
-  ArrowRight, Github, Paperclip, FileText, Zap,
+  ArrowRight, Paperclip, FileText, Zap,
   Brain, GitBranch, Bot, BarChart3,
   Shield, Check, Star, ChevronDown,
   Users, Sparkles, TrendingUp, Lock,
@@ -91,15 +91,6 @@ function Header() {
           <a href="#how-it-works" className="text-sm px-4 py-2 rounded-lg text-muted hover:text-text transition-colors font-display font-500">How It Works</a>
           <a href="#pricing" className="text-sm px-4 py-2 rounded-lg text-muted hover:text-text transition-colors font-display font-500">Pricing</a>
           <a href="#faq" className="text-sm px-4 py-2 rounded-lg text-muted hover:text-text transition-colors font-display font-500">FAQ</a>
-          <span className="w-px h-5 bg-border mx-1" />
-          <a
-            href="https://github.com/666ghj/MiroFish"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 text-sm px-3 py-2 rounded-lg text-muted hover:text-text hover:bg-white/5 transition-all duration-200 font-display font-500"
-          >
-            <Github className="w-4 h-4" />
-          </a>
           <UserMenu />
         </nav>
 
@@ -802,19 +793,6 @@ function Footer() {
               <div className="space-y-2">
                 <Link href="/auth/signin" className="block font-body text-sm text-muted hover:text-text transition-colors">Sign In</Link>
                 <Link href="/chat" className="block font-body text-sm text-muted hover:text-text transition-colors">Try It Free</Link>
-              </div>
-            </div>
-            <div>
-              <p className="font-mono text-xs text-muted/50 uppercase tracking-widest mb-3">Open Source</p>
-              <div className="space-y-2">
-                <a
-                  href="https://github.com/666ghj/MiroFish"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 font-body text-sm text-muted hover:text-text transition-colors"
-                >
-                  <Github className="w-3.5 h-3.5" />GitHub
-                </a>
               </div>
             </div>
           </div>
