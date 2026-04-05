@@ -5,17 +5,14 @@ import { X, Zap, Infinity, Star } from 'lucide-react';
 import { CREDIT_PACKAGES, SUBSCRIPTION_PLAN } from '@/lib/credits';
 import { useCredits } from '@/components/providers/CreditsProvider';
 import PackageCard from './PackageCard';
-import PayPalCheckout from './PayPalCheckout';
 import CryptoPayment from './CryptoPayment';
 import SubscriptionCheckout from './SubscriptionCheckout';
 
-type Tab = 'paypal' | 'crypto';
 type Mode = 'subscription' | 'credits';
 
 export default function BuyCreditsModal() {
   const { credits, showBuyModal, setShowBuyModal, refresh, isSubscribed, subscriptionExpires } = useCredits();
   const [selectedPackage, setSelectedPackage] = useState('pro');
-  const [tab, setTab] = useState<Tab>('paypal');
   const [mode, setMode] = useState<Mode>('credits');
   const [successMsg, setSuccessMsg] = useState('');
 
@@ -26,12 +23,6 @@ export default function BuyCreditsModal() {
     setSuccessMsg('');
   }
 
-  async function handlePayPalSuccess() {
-    await refresh();
-    setSuccessMsg('Payment successful! Credits added to your account.');
-    setTimeout(handleClose, 2500);
-  }
-
   function handleCryptoSuccess() {
     setSuccessMsg('Request submitted! Credits will be added after verification (1–24 hours).');
     setTimeout(handleClose, 3000);
@@ -39,8 +30,8 @@ export default function BuyCreditsModal() {
 
   async function handleSubscriptionSuccess() {
     await refresh();
-    setSuccessMsg('Subscription activated! Unlimited predictions for 30 days.');
-    setTimeout(handleClose, 2500);
+    setSuccessMsg('Subscription request submitted! Will be activated after verification (1–24 hours).');
+    setTimeout(handleClose, 3000);
   }
 
   return (
@@ -154,40 +145,13 @@ export default function BuyCreditsModal() {
               )}
 
               {/* ── Payment area ── */}
-              {mode === 'subscription' ? (
-                <div className="min-h-[140px]">
+              <div className="min-h-[160px]">
+                {mode === 'subscription' ? (
                   <SubscriptionCheckout onSuccess={handleSubscriptionSuccess} />
-                </div>
-              ) : (
-                <>
-                  {/* Payment tabs */}
-                  <div className="flex gap-1 p-1 bg-card rounded-xl">
-                    {(['paypal', 'crypto'] as Tab[]).map((t) => (
-                      <button
-                        key={t}
-                        type="button"
-                        onClick={() => setTab(t)}
-                        className={`flex-1 py-2 rounded-lg font-display font-600 text-xs transition-all ${
-                          tab === t
-                            ? 'bg-surface text-bright shadow-card'
-                            : 'text-muted hover:text-text'
-                        }`}
-                      >
-                        {t === 'paypal' ? 'PayPal' : 'Crypto'}
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Payment content */}
-                  <div className="min-h-[160px]">
-                    {tab === 'paypal' ? (
-                      <PayPalCheckout packageId={selectedPackage} onSuccess={handlePayPalSuccess} />
-                    ) : (
-                      <CryptoPayment packageId={selectedPackage} onSuccess={handleCryptoSuccess} />
-                    )}
-                  </div>
-                </>
-              )}
+                ) : (
+                  <CryptoPayment packageId={selectedPackage} onSuccess={handleCryptoSuccess} />
+                )}
+              </div>
             </>
           )}
         </div>

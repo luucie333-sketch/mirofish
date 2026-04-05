@@ -10,18 +10,7 @@ interface CryptoPaymentProps {
   onSuccess: () => void;
 }
 
-const WALLETS = [
-  { type: 'BTC', label: 'Bitcoin', envKey: 'NEXT_PUBLIC_BTC_WALLET' as const },
-  { type: 'ETH', label: 'Ethereum', envKey: 'NEXT_PUBLIC_ETH_WALLET' as const },
-  { type: 'USDT', label: 'USDT (TRC-20)', envKey: 'NEXT_PUBLIC_USDT_TRC20_WALLET' as const },
-];
-
-function getWalletAddress(envKey: string): string {
-  if (envKey === 'NEXT_PUBLIC_BTC_WALLET') return process.env.NEXT_PUBLIC_BTC_WALLET ?? '';
-  if (envKey === 'NEXT_PUBLIC_ETH_WALLET') return process.env.NEXT_PUBLIC_ETH_WALLET ?? '';
-  if (envKey === 'NEXT_PUBLIC_USDT_TRC20_WALLET') return process.env.NEXT_PUBLIC_USDT_TRC20_WALLET ?? '';
-  return '';
-}
+const USDT_WALLET = { label: 'USDT (TRC-20)', address: process.env.NEXT_PUBLIC_USDT_TRC20_WALLET ?? '' };
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
@@ -43,14 +32,12 @@ function CopyButton({ text }: { text: string }) {
 }
 
 export default function CryptoPayment({ packageId, onSuccess }: CryptoPaymentProps) {
-  const [selectedWallet, setSelectedWallet] = useState('BTC');
   const [txHash, setTxHash] = useState('');
   const [status, setStatus] = useState<'idle' | 'submitting' | 'submitted' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = useState('');
 
   const pkg = CREDIT_PACKAGES.find((p) => p.id === packageId);
-  const wallet = WALLETS.find((w) => w.type === selectedWallet)!;
-  const address = getWalletAddress(wallet.envKey);
+  const { label: walletLabel, address } = USDT_WALLET;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -60,7 +47,7 @@ export default function CryptoPayment({ packageId, onSuccess }: CryptoPaymentPro
     const res = await fetch('/api/payments/crypto/request', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ packageId, walletType: selectedWallet, txHash }),
+      body: JSON.stringify({ packageId, walletType: 'USDT', txHash }),
     });
 
     if (res.ok) {
@@ -93,28 +80,10 @@ export default function CryptoPayment({ packageId, onSuccess }: CryptoPaymentPro
 
   return (
     <div className="space-y-4">
-      {/* Wallet selector */}
-      <div className="flex gap-2">
-        {WALLETS.map((w) => (
-          <button
-            key={w.type}
-            type="button"
-            onClick={() => setSelectedWallet(w.type)}
-            className={`flex-1 py-2 rounded-lg border font-mono text-xs transition-all ${
-              selectedWallet === w.type
-                ? 'border-mint/40 bg-mint/10 text-mint'
-                : 'border-border text-muted hover:border-border/80 hover:text-text'
-            }`}
-          >
-            {w.type}
-          </button>
-        ))}
-      </div>
-
       {/* Wallet address + QR */}
       <div className="bg-card border border-border rounded-xl p-4 space-y-3">
         <div className="flex items-center justify-between">
-          <span className="font-mono text-xs text-muted">{wallet.label}</span>
+          <span className="font-mono text-xs text-muted">{walletLabel}</span>
           <span className="font-mono text-xs text-amber">${pkg.price}</span>
         </div>
 
