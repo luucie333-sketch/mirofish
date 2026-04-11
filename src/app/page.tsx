@@ -15,6 +15,7 @@ import { createClient } from '@/lib/supabase/client';
 import UserMenu from '@/components/auth/UserMenu';
 import { CREDIT_PACKAGES, SUBSCRIPTION_PLAN } from '@/lib/credits';
 import DemoReport from '@/components/landing/DemoReport';
+import SiteFooter from '@/components/site/SiteFooter';
 
 /* ─── Scroll-in animation hook ─────────────────────────────────────────────── */
 function useInView(threshold = 0.12) {
@@ -890,7 +891,7 @@ export default function HomePage() {
       <CTABanner />
 
       {/* 9. Footer */}
-      <Footer />
+      <SiteFooter />
     </div>
   );
 }
