@@ -3,6 +3,7 @@ import { Suspense } from 'react';
 import './globals.css';
 import { CreditsProvider } from '@/components/providers/CreditsProvider';
 import BuyCreditsModal from '@/components/credits/BuyCreditsModal';
+import { SpeedInsights } from '@vercel/speed-insights/next';
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://mirofish.us'),
@@ -83,6 +84,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <BuyCreditsModal />
           </Suspense>
         </CreditsProvider>
+        <SpeedInsights />
       </body>
     </html>
   );
